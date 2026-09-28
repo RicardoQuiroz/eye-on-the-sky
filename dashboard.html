@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eye on the Sky — Dashboard Docente</title>
+  <meta name="description" content="Panel de monitoreo del docente para el seguimiento del trabajo de investigación de los estudiantes." />
+  <link rel="stylesheet" href="css/styles.css" />
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="dashboard-app">
+
+  <!-- ══════════════════════════════════════════════
+       ENCABEZADO DEL DASHBOARD
+  ══════════════════════════════════════════════ -->
+  <header id="dash-header">
+    <div class="flex items-center gap-3">
+      <a href="index.html" style="color: var(--accent); font-weight: 700; text-decoration: none; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>
+        Eye on the Sky
+      </a>
+      <span style="color: var(--border);">|</span>
+      <h1>Dashboard Docente</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="dash-course-label" class="text-sm text-muted"></span>
+      <button class="btn btn-ghost btn-sm btn-icon" id="dash-btn-theme" title="Cambiar tema">
+        <svg id="dash-theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="dash-theme-icon-dark" class="hidden" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="btn btn-sm" id="btn-export-report">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
+        Exportar reporte CSV
+      </button>
+    </div>
+  </header>
+
+  <div id="dash-content">
+
+    <!-- ══════════════════════════════════════════════
+         ZONA DE CARGA DE ARCHIVOS JSON
+    ══════════════════════════════════════════════ -->
+    <div id="upload-zone" role="button" tabindex="0" aria-label="Cargar archivos JSON de estudiantes">
+      <input type="file" id="json-file-input" multiple accept=".json" />
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 12px; display: block; color: var(--accent); opacity: 0.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <h2>Cargar proyectos de estudiantes</h2>
+      <p>Arrastra uno o varios archivos <strong>documento.json</strong> aquí, o haz clic para seleccionarlos.</p>
+      <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">Puedes cargar todos los archivos del curso de una sola vez.</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         PANEL PRINCIPAL (oculto hasta cargar datos)
+    ══════════════════════════════════════════════ -->
+    <div id="dash-main" class="hidden">
+
+      <!-- Estadísticas agregadas del curso -->
+      <div class="dash-stats-grid" id="course-stats-grid">
+        <!-- generado por JS -->
+      </div>
+
+      <!-- Gráficos -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 14px;">
+            Distribución: Escritura manual vs. pegado
+          </div>
+          <canvas id="chart-manual-vs-paste" height="200"></canvas>
+        </div>
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 14px;">
+            Sesiones de trabajo por estudiante
+          </div>
+          <canvas id="chart-sessions" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabla de estudiantes -->
+      <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <h2 style="font-size: 1rem; font-weight: 700;">Resumen por estudiante</h2>
+        <div class="flex gap-2">
+          <input type="text" class="form-input" id="dash-search" placeholder="Buscar estudiante…" style="width: 220px;" />
+          <select class="form-select" id="dash-filter-alert" style="width: 160px;">
+            <option value="">Todos los estados</option>
+            <option value="ok">Sin alertas</option>
+            <option value="warning">Alerta leve</option>
+            <option value="danger">Alerta crítica</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow-sm);">
+        <table class="dash-table" id="students-table">
+          <thead>
+            <tr>
+              <th data-col="student_name">Estudiante ↕</th>
+              <th data-col="total_sessions">Sesiones ↕</th>
+              <th data-col="total_days_active">Días activos ↕</th>
+              <th data-col="manual_ratio">% Manual ↕</th>
+              <th data-col="total_chars_pasted">Pegados ↕</th>
+              <th data-col="sources_count">Fuentes ↕</th>
+              <th data-col="sources_with_screenshot">Con captura ↕</th>
+              <th data-col="word_count">Palabras ↕</th>
+              <th>Alerta</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="students-table-body">
+            <!-- generado por JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Panel de detalle de estudiante -->
+      <div id="student-detail" class="hidden" style="margin-top: 24px;">
+        <div id="student-detail-header">
+          <div>
+            <h3 id="detail-student-name" style="font-size: 1rem; font-weight: 700;"></h3>
+            <p id="detail-doc-title" class="text-sm text-muted" style="margin-top: 2px;"></p>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-sm" id="detail-view-sources">Ver fuentes</button>
+            <button class="btn btn-sm" id="detail-view-sessions">Ver sesiones</button>
+            <button class="btn btn-ghost btn-sm btn-icon" id="close-student-detail">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div style="padding: 20px;">
+          <!-- Métricas del estudiante -->
+          <div class="dash-stats-grid" id="detail-stats-grid"></div>
+          <!-- Tabs de contenido -->
+          <div id="detail-tabs-content" style="margin-top: 16px;"></div>
+        </div>
+      </div>
+
+    </div><!-- /#dash-main -->
+
+  </div><!-- /#dash-content -->
+</div><!-- /#dashboard-app -->
+
+<div id="toast-container"></div>
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>

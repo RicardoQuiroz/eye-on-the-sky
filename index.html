@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eye on the Sky — Editor</title>
+  <meta name="description" content="Entorno de redacción académica supervisada para seminarios de investigación." />
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <!-- Quill editor -->
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ══════════════════════════════════════════════
+       BARRA SUPERIOR
+  ══════════════════════════════════════════════ -->
+  <header id="topbar">
+    <!-- Logo -->
+    <a id="app-logo" href="#" title="Eye on the Sky">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      </svg>
+      Eye on the Sky
+    </a>
+
+    <!-- Título del documento -->
+    <input id="doc-title-input" type="text" placeholder="Sin título" title="Haz clic para editar el título del documento" />
+
+    <!-- Estado del guardado -->
+    <div id="save-status" class="unsaved" title="Estado del guardado automático">
+      <span class="status-dot"></span>
+      <span id="save-status-text">Sin guardar</span>
+    </div>
+
+    <!-- Acciones topbar -->
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm btn-icon" id="btn-toggle-sources" title="Panel de fuentes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </button>
+
+      <button class="btn btn-ghost btn-sm btn-icon" id="btn-toggle-tele" title="Panel de actividad">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </button>
+
+      <button class="btn btn-ghost btn-sm btn-icon" id="btn-theme" title="Cambiar tema">
+        <svg id="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="theme-icon-dark" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+
+      <!-- Menú de exportación -->
+      <div class="dropdown">
+        <button class="btn btn-sm" id="btn-export-menu">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Exportar</span>
+        </button>
+        <div class="dropdown-menu" id="export-menu">
+          <div class="dropdown-item" id="export-pdf">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Exportar a PDF
+          </div>
+          <div class="dropdown-item" id="export-docx">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Exportar a Word (.docx)
+          </div>
+          <div class="dropdown-item" id="export-ris">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
+            Exportar bibliografía (.ris para Zotero)
+          </div>
+          <div class="dropdown-separator"></div>
+          <div class="dropdown-item" id="export-json">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
+            Guardar copia del proyecto (.json)
+          </div>
+        </div>
+      </div>
+
+      <!-- Botón principal: Abrir carpeta -->
+      <button class="btn btn-primary btn-sm" id="btn-open-folder">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span id="open-folder-label">Abrir / Crear proyecto</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════
+       TOOLBAR DE FORMATO
+  ══════════════════════════════════════════════ -->
+  <div id="toolbar-wrapper">
+    <div id="quill-toolbar">
+      <!-- Encabezados -->
+      <span class="ql-formats">
+        <select class="ql-header">
+          <option value="1">Título 1</option>
+          <option value="2">Título 2</option>
+          <option value="3">Título 3</option>
+          <option selected>Normal</option>
+        </select>
+      </span>
+      <!-- Formato básico -->
+      <span class="ql-formats">
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+      </span>
+      <!-- Listas -->
+      <span class="ql-formats">
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+      </span>
+      <!-- Alineación -->
+      <span class="ql-formats">
+        <select class="ql-align"></select>
+      </span>
+      <!-- Limpiar formato -->
+      <span class="ql-formats">
+        <button class="ql-clean"></button>
+      </span>
+    </div>
+
+    <!-- Botones personalizados -->
+    <div class="toolbar-group" style="border-left: 1px solid var(--border); margin-left: 8px; padding-left: 12px;">
+      <button class="btn btn-ghost btn-sm" id="btn-insert-citation" title="Insertar cita bibliográfica">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+        Citar fuente
+      </button>
+      <button class="btn btn-ghost btn-sm" id="btn-insert-screenshot" title="Insertar captura de pantalla PDF">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Insertar captura PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       LAYOUT PRINCIPAL
+  ══════════════════════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- Sidebar de fuentes (izquierda) -->
+    <aside id="sidebar-sources">
+      <div class="sidebar-header">
+        <span>Fuentes</span>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-add-source" title="Agregar nueva fuente">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="sidebar-content" id="sources-list">
+        <p class="text-sm text-muted" style="padding: 8px 4px;">
+          Aún no hay fuentes registradas. Haz clic en <strong>+</strong> para agregar la primera.
+        </p>
+      </div>
+    </aside>
+
+    <!-- Área del editor -->
+    <main id="editor-area">
+      <div id="document-sheet">
+        <div id="quill-editor"></div>
+      </div>
+    </main>
+
+    <!-- Sidebar de actividad (derecha) -->
+    <aside id="sidebar-telemetry">
+      <div class="sidebar-header">
+        <span>Actividad</span>
+      </div>
+
+      <!-- Salud del manuscrito -->
+      <div id="health-bar-container" class="tele-section">
+        <div class="health-label">
+          <span>Escritura manual</span>
+          <span id="health-percent">—</span>
+        </div>
+        <div class="health-track">
+          <div class="health-fill" id="health-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Estadísticas de sesión -->
+      <div class="tele-section">
+        <div class="tele-title">Sesión actual</div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Palabras escritas</span>
+          <span class="tele-stat-value" id="tele-words-typed">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Eventos de pegado</span>
+          <span class="tele-stat-value" id="tele-paste-count">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Tiempo activo</span>
+          <span class="tele-stat-value" id="tele-session-time">00:00</span>
+        </div>
+      </div>
+
+      <!-- Totales históricos -->
+      <div class="tele-section">
+        <div class="tele-title">Total del proyecto</div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Sesiones de trabajo</span>
+          <span class="tele-stat-value" id="tele-total-sessions">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Fuentes con captura</span>
+          <span class="tele-stat-value" id="tele-sources-with-img">0/0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Días de trabajo</span>
+          <span class="tele-stat-value" id="tele-days-active">0</span>
+        </div>
+      </div>
+    </aside>
+
+  </div><!-- /#main-layout -->
+
+  <!-- Barra de estado inferior -->
+  <footer id="statusbar">
+    <div class="status-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <span id="sb-word-count">0 palabras</span>
+    </div>
+    <div class="status-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span id="sb-session-time">Sesión: 00:00</span>
+    </div>
+    <div class="status-item" style="margin-left: auto;">
+      <span id="sb-citation-style">Chicago (Nota completa)</span>
+    </div>
+    <div class="status-item">
+      <span id="sb-project-name">Proyecto sin guardar</span>
+    </div>
+  </footer>
+
+</div><!-- /#app -->
+
+<!-- ══════════════════════════════════════════════
+     MODAL: Agregar fuente
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-source-overlay">
+  <div class="modal" id="modal-source" role="dialog" aria-modal="true" aria-labelledby="modal-source-title">
+    <div class="modal-header">
+      <h3 id="modal-source-title">Agregar fuente bibliográfica</h3>
+      <button class="btn btn-ghost btn-icon" id="close-modal-source" aria-label="Cerrar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Búsqueda por DOI -->
+      <div class="form-group">
+        <label class="form-label" for="source-doi-search">Buscar por DOI (opcional)</label>
+        <div class="flex gap-2">
+          <input class="form-input" id="source-doi-search" type="text" placeholder="10.1234/ejemplo" />
+          <button class="btn btn-sm" id="btn-fetch-doi" style="white-space:nowrap;">Buscar</button>
+        </div>
+        <p class="text-sm text-muted mt-1">Se completarán automáticamente los datos desde Crossref.</p>
+      </div>
+      <hr class="divider" />
+      <!-- Campos manuales -->
+      <div class="form-group">
+        <label class="form-label" for="source-type">Tipo de fuente</label>
+        <select class="form-select" id="source-type">
+          <option value="journal">Artículo de revista científica</option>
+          <option value="book">Libro</option>
+          <option value="chapter">Capítulo de libro</option>
+          <option value="thesis">Tesis o disertación</option>
+          <option value="conference">Ponencia o conferencia</option>
+          <option value="website">Sitio web</option>
+          <option value="report">Reporte o documento institucional</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="source-title">Título *</label>
+        <input class="form-input" id="source-title" type="text" placeholder="Título completo de la obra" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="source-authors">Autor(es) *</label>
+        <input class="form-input" id="source-authors" type="text" placeholder="Apellido, Nombre; Apellido, Nombre" required />
+        <p class="text-sm text-muted mt-1">Separa múltiples autores con punto y coma (;)</p>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="source-year">Año *</label>
+          <input class="form-input" id="source-year" type="number" placeholder="2024" min="1900" max="2099" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="source-doi">DOI / URL</label>
+          <input class="form-input" id="source-doi" type="text" placeholder="10.xxxx/xxxx o https://..." />
+        </div>
+      </div>
+      <div class="form-row" id="journal-fields">
+        <div class="form-group">
+          <label class="form-label" for="source-journal">Revista / Editorial</label>
+          <input class="form-input" id="source-journal" type="text" placeholder="Nombre de la revista" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="source-pages">Páginas</label>
+          <input class="form-input" id="source-pages" type="text" placeholder="123-145" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="source-citation-style">Estilo de citación</label>
+        <select class="form-select" id="source-citation-style">
+          <option value="chicago-note">Chicago (Nota completa)</option>
+          <option value="chicago-author-date">Chicago (Autor-fecha)</option>
+          <option value="apa">APA 7ª edición</option>
+          <option value="mla">MLA 9ª edición</option>
+        </select>
+      </div>
+      <!-- Captura de pantalla -->
+      <div class="form-group">
+        <label class="form-label">Captura de pantalla del PDF (evidencia)</label>
+        <div class="drop-zone" id="source-screenshot-dropzone">
+          <input type="file" id="source-screenshot-input" accept="image/*" />
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px; display: block; opacity: 0.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <p>Arrastra la imagen aquí o <strong>haz clic para seleccionar</strong></p>
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px;">PNG, JPG, WebP — máx. 5 MB</p>
+        </div>
+        <div id="screenshot-preview" class="hidden" style="margin-top: 10px;">
+          <img id="screenshot-preview-img" src="" alt="Vista previa" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border);" />
+          <button class="btn btn-sm btn-ghost text-danger" id="remove-screenshot" style="margin-top: 6px;">Quitar imagen</button>
+        </div>
+        <p class="text-sm text-muted mt-1" id="screenshot-note">
+          La imagen se copiará a la carpeta <code>capturas/</code> del proyecto. El JSON almacenará solo la ruta relativa.
+        </p>
+      </div>
+
+      <!-- ── Importación BibTeX ── -->
+      <hr class="divider" />
+      <div class="form-group">
+        <label class="form-label" for="bibtex-input">
+          Importar desde BibTeX
+          <span style="font-weight: 400; color: var(--text-muted); margin-left: 4px;">(individual o en lote)</span>
+        </label>
+        <textarea
+          class="form-textarea"
+          id="bibtex-input"
+          placeholder="Pega aquí una o varias entradas BibTeX. Ejemplo:
+
+@article{apellido2023,
+  author  = {Apellido, Nombre and Apellido2, Nombre2},
+  title   = {Título del artículo},
+  journal = {Nombre de la revista},
+  year    = {2023},
+  pages   = {45--68},
+  doi     = {10.xxxx/xxxx}
+}
+
+@book{autor2021,
+  author    = {Autor, Nombre},
+  title     = {Título del libro},
+  publisher = {Editorial},
+  year      = {2021}
+}"
+          style="min-height: 140px; font-family: 'Courier New', monospace; font-size: 0.78rem; line-height: 1.5;"
+        ></textarea>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+          <button class="btn btn-sm" id="btn-parse-bibtex">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            Importar entradas
+          </button>
+          <span class="text-sm text-muted">Detecta duplicados automáticamente por clave BibTeX.</span>
+        </div>
+        <p class="text-sm mt-1" id="bibtex-import-result"></p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="cancel-source">Cancelar</button>
+      <button class="btn btn-primary" id="save-source">Guardar fuente</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: Insertar cita
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-citation-overlay">
+  <div class="modal" id="modal-citation" role="dialog" aria-modal="true" aria-labelledby="modal-citation-title">
+    <div class="modal-header">
+      <h3 id="modal-citation-title">Insertar cita en el texto</h3>
+      <button class="btn btn-ghost btn-icon" id="close-modal-citation" aria-label="Cerrar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="citation-source-select">Seleccionar fuente</label>
+        <select class="form-select" id="citation-source-select">
+          <option value="">— Elige una fuente registrada —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="citation-page">Página(s) citada(s)</label>
+        <input class="form-input" id="citation-page" type="text" placeholder="Ej.: 45 o 45-48" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vista previa de la cita</label>
+        <div id="citation-preview" style="padding: 12px; background: var(--bg-sidebar); border-radius: 7px; font-size: 0.85rem; border: 1px solid var(--border); color: var(--text-secondary); min-height: 48px; font-family: var(--font-doc);">
+          Selecciona una fuente para ver la cita generada.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="cancel-citation">Cancelar</button>
+      <button class="btn btn-primary" id="insert-citation-btn">Insertar en el texto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: Sin proyecto abierto (onboarding)
+══════════════════════════════════════════════ -->
+<div class="modal-overlay open" id="modal-onboarding-overlay">
+  <div class="modal" style="max-width: 460px;" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div class="modal-header">
+      <h3 id="onboarding-title">Bienvenido a Eye on the Sky</h3>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">
+        Esta aplicación guarda tu trabajo en una carpeta de tu computador. Todo permanece local — no se sube a ningún servidor.
+      </p>
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 20px;">
+        Para comenzar, elige qué quieres hacer:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn-primary w-full" id="onboard-new" style="justify-content: center; padding: 13px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Crear nuevo documento
+        </button>
+        <button class="btn w-full" id="onboard-open" style="justify-content: center; padding: 13px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Abrir proyecto existente
+        </button>
+      </div>
+      <p class="text-sm text-muted" style="margin-top: 16px; text-align: center;">
+        El guardado automático se activará en cuanto elijas una carpeta.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Contenedor de toasts -->
+<div id="toast-container"></div>
+
+<!-- ══════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════ -->
+<!-- Quill -->
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
+<!-- docx para exportar Word -->
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<!-- JSZip -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Lógica principal -->
+<script src="js/editor.js"></script>
+
+</body>
+</html>
