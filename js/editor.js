@@ -53,16 +53,19 @@ const App = {
     }
   },
 
-  // Estado de la sesión actual (no se persiste en el JSON definitivo hasta cierre)
+  // Estado de la sesión actual
   session: {
-    start_time:      null,
-    words_typed:     0,
-    chars_pasted:    0,
-    paste_events:    [],
-    keystroke_count: 0,
-    active_days_set: new Set(),
-    timer_ref:       null,
-    autosave_ref:    null,
+    id:                null,   // 'ses_...'
+    session_number:    1,
+    start_time:        null,
+    words_typed:       0,
+    chars_pasted:      0,
+    paste_events:      [],
+    keystroke_count:   0,
+    initial_word_count: 0,
+    active_days_set:   new Set(),
+    timer_ref:         null,
+    autosave_ref:      null,
     previousWordCount: 0,  // para calcular diff de palabras real
     isPasting:         false, // flag para text-change: ignorar palabras de paste
   },
@@ -115,7 +118,6 @@ function initQuill() {
     // Solo sumar al conteo manual si NO fue un pegado
     if (!App.session.isPasting && wordDiff > 0) {
       App.session.words_typed += wordDiff;
-      App.project.telemetry.summary.total_words_typed += wordDiff;
     }
 
     App.session.previousWordCount = currentWC;
@@ -123,10 +125,15 @@ function initQuill() {
     updateTelemetryUI();
   });
 
-  // Detectar eventos de pegado directamente en el editor
+  // Activar corrector ortográfico nativo del navegador en español
   const editorEl = document.querySelector('#quill-editor .ql-editor');
-  editorEl.addEventListener('paste', handlePasteEvent);
-  editorEl.addEventListener('keydown', handleKeystrokeEvent);
+  if (editorEl) {
+    editorEl.setAttribute('spellcheck', 'true');
+    editorEl.setAttribute('lang', 'es');
+    editorEl.setAttribute('autocorrect', 'on');
+    editorEl.addEventListener('paste', handlePasteEvent);
+    editorEl.addEventListener('keydown', handleKeystrokeEvent);
+  }
 }
 
 /* ================================================================
@@ -157,7 +164,6 @@ function handlePasteEvent(e) {
   if (!isInitialPaste) {
     // Solo penalizar pastes que no son el inicial
     App.session.chars_pasted += chars;
-    App.project.telemetry.summary.total_chars_pasted += chars;
   } else {
     showToast('Pegado inicial registrado sin penalización.', 'success');
   }
@@ -177,18 +183,21 @@ function handleKeystrokeEvent(e) {
 function initSessionTimer() {
   App.session.start_time = new Date();
   App.session.timer_ref = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - App.session.start_time) / 1000);
+    if (!App.session.start_time) return;
+    const elapsed = Math.floor((Date.now() - App.session.start_time.getTime()) / 1000);
     const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
     const ss = String(elapsed % 60).padStart(2, '0');
-    document.getElementById('tele-session-time').textContent = `${mm}:${ss}`;
-    document.getElementById('sb-session-time').textContent   = `Sesión: ${mm}:${ss}`;
+    const teleTimerEl = document.getElementById('tele-session-time');
+    const sbTimerEl   = document.getElementById('sb-session-time');
+    if (teleTimerEl) teleTimerEl.textContent = `${mm}:${ss}`;
+    if (sbTimerEl)   sbTimerEl.textContent   = `Sesión: ${mm}:${ss}`;
   }, 1000);
 }
 
 function updateTelemetryUI() {
   const typed = App.session.words_typed;
 
-  // Solo contar pastes NO iniciales para el ratio
+  // Solo contar pastes NO iniciales para el ratio de la sesión actual
   const penalizedPasteWords = App.session.paste_events
     .filter(ev => !ev.is_initial)
     .reduce((sum, ev) => sum + (ev.approx_words || 0), 0);
@@ -197,28 +206,41 @@ function updateTelemetryUI() {
   // Si no hay actividad aún, ratio = 100% (no mostrar 0)
   const ratio = total > 0 ? Math.round((typed / total) * 100) : 100;
 
-  document.getElementById('tele-words-typed').textContent  = typed;
-  document.getElementById('tele-paste-count').textContent  =
-    App.session.paste_events.filter(ev => !ev.is_initial).length;
+  const wordsTypedEl = document.getElementById('tele-words-typed');
+  if (wordsTypedEl) wordsTypedEl.textContent = typed;
+  const pasteCountEl = document.getElementById('tele-paste-count');
+  if (pasteCountEl) pasteCountEl.textContent = App.session.paste_events.filter(ev => !ev.is_initial).length;
 
   // Barra de salud
   const fill = document.getElementById('health-fill');
   const pct  = document.getElementById('health-percent');
-  fill.style.width = `${ratio}%`;
-  pct.textContent  = `${ratio}%`;
-  fill.classList.remove('medium', 'low');
-  if (ratio < 50) fill.classList.add('low');
-  else if (ratio < 75) fill.classList.add('medium');
-
-  // Actualizar resumen
-  App.project.telemetry.summary.manual_ratio = ratio / 100;
+  if (fill && pct) {
+    fill.style.width = `${ratio}%`;
+    pct.textContent  = `${ratio}%`;
+    fill.classList.remove('medium', 'low');
+    if (ratio < 50) fill.classList.add('low');
+    else if (ratio < 75) fill.classList.add('medium');
+  }
 
   // Fuentes con captura
-  const withImg    = App.project.sources.filter(s => s.screenshot_filename).length;
-  const totalSrcs  = App.project.sources.length;
-  document.getElementById('tele-sources-with-img').textContent = `${withImg}/${totalSrcs}`;
-  document.getElementById('tele-total-sessions').textContent   =
-    App.project.telemetry.summary.total_sessions + 1;
+  const withImg    = (App.project.sources || []).filter(s => s.screenshot_filename).length;
+  const totalSrcs  = (App.project.sources || []).length;
+  const sourcesImgEl = document.getElementById('tele-sources-with-img');
+  if (sourcesImgEl) sourcesImgEl.textContent = `${withImg}/${totalSrcs}`;
+
+  // Totales acumulados históricos
+  const totalSessionsCount = (App.project.telemetry?.sessions || []).length || 1;
+  const totalSessionsEl = document.getElementById('tele-total-sessions');
+  if (totalSessionsEl) totalSessionsEl.textContent = totalSessionsCount;
+
+  const daysActiveEl = document.getElementById('tele-days-active');
+  if (daysActiveEl) {
+    const daysSet = new Set((App.project.telemetry?.sessions || []).map(s => s.date).filter(Boolean));
+    if (App.session.start_time) {
+      daysSet.add(App.session.start_time.toISOString().split('T')[0]);
+    }
+    daysActiveEl.textContent = daysSet.size || 1;
+  }
 }
 
 /* ================================================================
@@ -263,11 +285,47 @@ async function openOrCreateProject(mode) {
   }
 }
 
+function startProjectSession() {
+  const currentText = App.quill ? App.quill.getText() : '';
+  const currentWC = countWords(currentText);
+
+  // Asegurar estructura de telemetría en el proyecto
+  if (!App.project.telemetry) {
+    App.project.telemetry = { sessions: [], summary: {} };
+  }
+  if (!Array.isArray(App.project.telemetry.sessions)) {
+    App.project.telemetry.sessions = [];
+  }
+
+  const sessionNum = App.project.telemetry.sessions.length + 1;
+  const now = new Date();
+
+  App.session.id = 'ses_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  App.session.session_number = sessionNum;
+  App.session.start_time = now;
+  App.session.words_typed = 0;
+  App.session.chars_pasted = 0;
+  App.session.paste_events = [];
+  App.session.keystroke_count = 0;
+  App.session.initial_word_count = currentWC;
+  App.session.previousWordCount = currentWC;
+
+  // Reconstruir conjunto de fechas activas
+  App.session.active_days_set = new Set(
+    App.project.telemetry.sessions.map(s => s.date).filter(Boolean)
+  );
+  App.session.active_days_set.add(now.toISOString().split('T')[0]);
+
+  updateTelemetryUI();
+}
+
 async function createNewProject(dirHandle) {
-  // El JSON ya tiene estructura inicial; solo guardar
+  // Inicializar metadatos del proyecto
   App.project.metadata.created_at = new Date().toISOString();
   App.project.metadata.title = 'Sin título';
   document.getElementById('doc-title-input').value = '';
+
+  startProjectSession();
   await saveProject();
   showToast('Proyecto creado. El autoguardado está activo.', 'success');
 }
@@ -293,9 +351,9 @@ async function loadExistingProject(dirHandle) {
     delete App.project._signature;
 
     // Restaurar contenido en Quill
-    if (App.project.content.delta) {
+    if (App.project.content && App.project.content.delta) {
       App.quill.setContents(App.project.content.delta, 'silent');
-    } else if (App.project.content.html) {
+    } else if (App.project.content && App.project.content.html) {
       App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
     }
 
@@ -304,13 +362,16 @@ async function loadExistingProject(dirHandle) {
 
     // Cargar fuentes en el panel
     renderSourcesList();
-    updateTelemetryUI();
 
     // Contar palabras
-    updateWordCount(countWords(App.quill.getText()));
+    const currentWC = countWords(App.quill.getText());
+    updateWordCount(currentWC);
 
-    // Registrar inicio de sesión
-    App.project.telemetry.summary.total_sessions++;
+    // Inicializar nueva sesión de trabajo con el punto de partida actual
+    startProjectSession();
+
+    // Guardar para registrar la apertura de la nueva sesión
+    await saveProject();
 
     showToast(`Proyecto "${App.project.metadata.title || 'Sin título'}" cargado.`, 'success');
     updateSaveStatus('saved');
@@ -349,18 +410,72 @@ async function saveProject() {
     App.project.metadata.title = document.getElementById('doc-title-input').value.trim() || 'Sin título';
     App.project.metadata.last_saved = new Date().toISOString();
 
-    // Construir sesión actual para el resumen
-    const todayStr = new Date().toDateString();
-    App.session.active_days_set.add(todayStr);
-    App.project.telemetry.summary.total_days_active = App.session.active_days_set.size;
-    App.project.telemetry.summary.total_chars_pasted += App.session.chars_pasted;
-    App.session.chars_pasted = 0; // reset para no duplicar en el próximo save
+    const currentWC = countWords(App.quill.getText());
+    const now = new Date();
+    const startTime = App.session.start_time || now;
+    const durationMin = Math.max(1, Math.round((now.getTime() - startTime.getTime()) / 60000));
+    const todayISO = startTime.toISOString().split('T')[0];
 
-    // Calcular fuentes con captura
-    App.project.telemetry.summary.sources_with_screenshot =
-      App.project.sources.filter(s => s.screenshot_filename).length;
-    App.project.telemetry.summary.sources_cited_in_text =
-      App.project.sources.filter(s => s.cited_in_text).length;
+    // Asegurar estructura
+    if (!App.project.telemetry) App.project.telemetry = { sessions: [], summary: {} };
+    if (!Array.isArray(App.project.telemetry.sessions)) App.project.telemetry.sessions = [];
+
+    // Si aún no hay ID de sesión, generar uno
+    if (!App.session.id) {
+      App.session.id = 'ses_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      App.session.session_number = App.project.telemetry.sessions.length + 1;
+    }
+
+    // Registro detallado de la sesión activa
+    const currentSessionRecord = {
+      session_id:         App.session.id,
+      session_number:     App.session.session_number,
+      date:               todayISO,
+      start_time:         startTime.toISOString(),
+      end_time:           now.toISOString(),
+      duration_minutes:   durationMin,
+      initial_word_count: App.session.initial_word_count || 0,
+      final_word_count:   currentWC,
+      words_net_change:   currentWC - (App.session.initial_word_count || 0),
+      words_typed:        App.session.words_typed,
+      chars_pasted:       App.session.chars_pasted,
+      paste_events:       [...App.session.paste_events],
+      keystroke_count:    App.session.keystroke_count,
+    };
+
+    // Actualizar o agregar la sesión activa en el historial de sesiones
+    const existingIndex = App.project.telemetry.sessions.findIndex(s => s.session_id === App.session.id);
+    if (existingIndex >= 0) {
+      App.project.telemetry.sessions[existingIndex] = currentSessionRecord;
+    } else {
+      App.project.telemetry.sessions.push(currentSessionRecord);
+    }
+
+    // Consolidar resumen de todas las sesiones
+    const allSessions = App.project.telemetry.sessions;
+    const daysSet = new Set(allSessions.map(s => s.date).filter(Boolean));
+    const totalWordsTyped = allSessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
+    const totalCharsPasted = allSessions.reduce((sum, s) => sum + (s.chars_pasted || 0), 0);
+
+    let allPenalizedPasteWords = 0;
+    allSessions.forEach(s => {
+      (s.paste_events || []).forEach(ev => {
+        if (!ev.is_initial) allPenalizedPasteWords += (ev.approx_words || 0);
+      });
+    });
+
+    const totalCalculated = totalWordsTyped + allPenalizedPasteWords;
+    const manualRatio = totalCalculated > 0 ? (totalWordsTyped / totalCalculated) : 1;
+
+    App.project.telemetry.summary = {
+      total_sessions:          allSessions.length,
+      total_days_active:       daysSet.size,
+      total_words_typed:       totalWordsTyped,
+      total_chars_pasted:      totalCharsPasted,
+      manual_ratio:            Math.round(manualRatio * 100) / 100,
+      sources_with_screenshot: (App.project.sources || []).filter(s => s.screenshot_filename).length,
+      sources_cited_in_text:   (App.project.sources || []).filter(s => s.cited_in_text).length,
+    };
 
     // Crear objeto a serializar (sin imágenes base64 — solo rutas relativas)
     const payload = structuredClone(App.project);
@@ -1102,9 +1217,17 @@ function initEventListeners() {
     }
   });
 
+  // Guardado automático al cambiar de pestaña o minimizar ventana
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && App.ui.isDirty && App.dirHandle) {
+      saveProject();
+    }
+  });
+
   // Aviso antes de cerrar si hay cambios
   window.addEventListener('beforeunload', (e) => {
     if (App.ui.isDirty && App.ui.projectLoaded) {
+      if (App.dirHandle) saveProject();
       e.preventDefault();
       e.returnValue = '';
     }

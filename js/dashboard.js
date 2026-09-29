@@ -56,6 +56,22 @@ function initEventListeners() {
     Dash.detailStudent = null;
   });
 
+  const btnSources = document.getElementById('detail-view-sources');
+  if (btnSources) {
+    btnSources.addEventListener('click', () => {
+      const el = document.getElementById('section-detail-sources');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  const btnSessions = document.getElementById('detail-view-sessions');
+  if (btnSessions) {
+    btnSessions.addEventListener('click', () => {
+      const el = document.getElementById('section-detail-sessions');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   // Ordenamiento por columna
   document.querySelectorAll('#students-table th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
@@ -135,40 +151,60 @@ async function parseStudentFile(file) {
 }
 
 function computeMetrics(project) {
-  const tele    = project.telemetry?.summary || {};
-  const sources = project.sources || [];
-  const content = project.content || {};
+  const tele     = project.telemetry?.summary || {};
+  const sources  = project.sources || [];
+  const sessions = project.telemetry?.sessions || [];
+  const content  = project.content || {};
 
   const wordCount = countWords(
     content.html ? stripHTML(content.html) : (content.text || '')
   );
+
+  const totalSessions = tele.total_sessions || sessions.length || 0;
+  const daysActive = tele.total_days_active || new Set(sessions.map(s => s.date).filter(Boolean)).size || 0;
 
   return {
     student_name:          project.metadata?.student_name || extractNameFromFilename(project._filename),
     doc_title:             project.metadata?.title || 'Sin título',
     created_at:            project.metadata?.created_at,
     last_saved:            project.metadata?.last_saved,
-    total_sessions:        tele.total_sessions       || 0,
-    total_days_active:     tele.total_days_active    || 0,
+    total_sessions:        totalSessions,
+    total_days_active:     daysActive,
     total_words_typed:     tele.total_words_typed    || 0,
     total_chars_pasted:    tele.total_chars_pasted   || 0,
-    manual_ratio:          tele.manual_ratio         || 0,
+    manual_ratio:          tele.manual_ratio !== undefined ? tele.manual_ratio : 0,
     sources_count:         sources.length,
     sources_with_screenshot: tele.sources_with_screenshot || sources.filter(s => s.screenshot_filename).length,
     sources_cited_in_text: tele.sources_cited_in_text || sources.filter(s => s.cited_in_text).length,
     word_count:            wordCount,
     integrity_ok:          project._integrity_ok,
+    sessions:              sessions,
   };
 }
 
 function computeAlerts(m) {
   const alerts = [];
 
-  // Alerta crítica: pocas sesiones
-  if (m.total_sessions <= 1) {
-    alerts.push({ level: 'danger', message: 'Documento creado en 1 sesión o menos' });
-  } else if (m.total_sessions <= 2) {
-    alerts.push({ level: 'warning', message: 'Solo 2 sesiones de trabajo registradas' });
+  // Alerta crítica: pocas sesiones para el volumen del trabajo
+  if (m.total_sessions <= 1 && m.word_count > 200) {
+    alerts.push({ level: 'danger', message: 'Documento realizado en 1 sola sesión (sin proceso incremental)' });
+  } else if (m.total_sessions <= 2 && m.word_count > 600) {
+    alerts.push({ level: 'warning', message: `Solo 2 sesiones para un manuscrito de ${m.word_count} palabras` });
+  }
+
+  // Detección de salto anómalo entre sesiones
+  if (m.sessions && m.sessions.length > 0) {
+    m.sessions.forEach(s => {
+      const net = (s.words_net_change !== undefined) ? s.words_net_change : ((s.final_word_count || 0) - (s.initial_word_count || 0));
+      const min = Math.max(1, s.duration_minutes || 1);
+      // Salto brusco: más de 400 palabras netas a un ritmo mayor de 65 palabras/minuto
+      if (net > 400 && (net / min) > 65) {
+        alerts.push({
+          level: 'warning',
+          message: `Salto atípico en sesión ${s.session_number || ''} (${s.date || ''}): +${net} palabras en ${min} min`
+        });
+      }
+    });
   }
 
   // Alerta crítica: poco texto manual
@@ -443,7 +479,7 @@ function showStudentDetail(encodedFilename) {
 
   // Fuentes
   const sourcesHTML = (student.sources || []).length > 0
-    ? `<div style="margin-top: 16px;">
+    ? `<div id="section-detail-sources" style="margin-top: 16px;">
         <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;">Fuentes registradas (${student.sources.length})</div>
         ${student.sources.map(src => `
           <div style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--bg-sidebar);">
@@ -466,29 +502,93 @@ function showStudentDetail(encodedFilename) {
 
   // Sesiones
   const sessions = student.telemetry?.sessions || [];
+
+  // Línea de tiempo de progreso incremental si hay múltiples sesiones
+  let progressTimelineHTML = '';
+  if (sessions.length > 1) {
+    const steps = sessions.map((s, idx) => {
+      const net = (s.words_net_change !== undefined) ? s.words_net_change : ((s.final_word_count || 0) - (s.initial_word_count || 0));
+      const sign = net > 0 ? '+' : '';
+      return `<div style="display:inline-flex; align-items:center; gap:6px; background:var(--bg-main); border:1px solid var(--border); padding:5px 12px; border-radius:18px; font-size:0.75rem; white-space:nowrap;">
+        <span style="font-weight:700; color:var(--primary);">S${s.session_number || (idx + 1)}</span>
+        <span style="color:var(--text-muted);">${s.date ? s.date.slice(5) : ''}:</span>
+        <strong>${s.final_word_count || 0} pal.</strong>
+        <span style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight:600;">(${sign}${net})</span>
+      </div>`;
+    }).join('<span style="color:var(--text-muted); font-size:0.85rem; padding: 0 4px;">➔</span>');
+
+    progressTimelineHTML = `
+      <div style="margin-bottom: 14px; padding: 12px 14px; background: var(--bg-sidebar); border-radius: 8px; border: 1px solid var(--border);">
+        <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px;">
+          Evolución incremental del manuscrito (sesión a sesión)
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center; overflow-x: auto; padding-bottom: 4px;">
+          ${steps}
+        </div>
+      </div>
+    `;
+  }
+
   const sessionsHTML = sessions.length > 0
-    ? `<div style="margin-top: 16px;">
-        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;">Historial de sesiones</div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--border);">
-              <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Fecha</th>
-              <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Duración</th>
-              <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Eventos de pegado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${sessions.map(s => `
-              <tr style="border-bottom: 1px solid var(--border);">
-                <td style="padding: 8px 10px;">${s.date ? new Date(s.date).toLocaleDateString('es') : '—'}</td>
-                <td style="padding: 8px 10px;">${s.duration_minutes ? s.duration_minutes + ' min' : '—'}</td>
-                <td style="padding: 8px 10px;">${(s.paste_events || []).length}</td>
+    ? `<div id="section-detail-sessions" style="margin-top: 20px;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px;">
+          Historial de sesiones (${sessions.length} registradas)
+        </div>
+        ${progressTimelineHTML}
+        <div style="overflow-x: auto; border: 1px solid var(--border); border-radius: 8px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: var(--bg-sidebar); border-bottom: 1px solid var(--border);">
+                <th style="text-align: center; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">#</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Fecha</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Horario</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Duración</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Progreso palabras</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Escrito manual</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Pegados</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Pulsaciones</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${sessions.map((s, idx) => {
+                const sDate = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('es') : (s.start_time ? new Date(s.start_time).toLocaleDateString('es') : '—');
+                const startTime = s.start_time ? new Date(s.start_time).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '';
+                const endTime = s.end_time ? new Date(s.end_time).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '';
+                const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || '—');
+                const net = (s.words_net_change !== undefined) ? s.words_net_change : ((s.final_word_count || 0) - (s.initial_word_count || 0));
+                const sign = net > 0 ? '+' : '';
+                const pasteCount = (s.paste_events || []).length;
+                const charsPasted = s.chars_pasted || (s.paste_events || []).reduce((sum, p) => sum + (p.chars_pasted || 0), 0);
+
+                return `
+                  <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 10px; text-align: center; font-weight: 600; color: var(--primary);">
+                      ${s.session_number || (idx + 1)}
+                    </td>
+                    <td style="padding: 8px 10px; font-weight: 500;">${sDate}</td>
+                    <td style="padding: 8px 10px; color: var(--text-muted);">${timeRange}</td>
+                    <td style="padding: 8px 10px;">${s.duration_minutes ? s.duration_minutes + ' min' : '—'}</td>
+                    <td style="padding: 8px 10px;">
+                      <span>${s.initial_word_count || 0} ➔ <strong>${s.final_word_count || 0}</strong></span>
+                      <span style="font-size: 0.75rem; margin-left: 4px; color: ${net >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">
+                        (${sign}${net})
+                      </span>
+                    </td>
+                    <td style="padding: 8px 10px;">${s.words_typed || 0} pal.</td>
+                    <td style="padding: 8px 10px;">
+                      ${pasteCount > 0 ? `<span style="color: var(--warning); font-weight: 600;">${pasteCount} (${charsPasted} car.)</span>` : '<span style="color: var(--text-muted);">0</span>'}
+                    </td>
+                    <td style="padding: 8px 10px; color: var(--text-muted);">${(s.keystroke_count || 0).toLocaleString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>`
-    : '';
+    : `<div class="text-sm text-muted" style="margin-top: 16px; padding: 12px; border: 1px dashed var(--border); border-radius: 8px;">
+        No hay registros individuales de sesiones en este archivo.
+       </div>`;
 
   document.getElementById('detail-tabs-content').innerHTML = alertsHTML + sourcesHTML + sessionsHTML;
 
