@@ -52,6 +52,11 @@
         <svg id="theme-icon-dark" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
 
+      <button class="btn btn-ghost btn-sm btn-icon" id="btn-sound-toggle" title="Efectos de sonido (Activados)">
+        <svg id="sound-icon-on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        <svg id="sound-icon-off" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+      </button>
+
       <!-- Menú de exportación -->
       <div class="dropdown">
         <button class="btn btn-sm" id="btn-export-menu">
@@ -210,6 +215,27 @@
         <div class="tele-stat">
           <span class="text-sm text-muted">Días de trabajo</span>
           <span class="tele-stat-value" id="tele-days-active">0</span>
+        </div>
+      </div>
+
+      <!-- Dinámica de tecleo / Biometría -->
+      <div class="tele-section" id="tele-biometrics-section">
+        <div class="tele-title">Identidad Biométrica</div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Estado huella</span>
+          <span class="tele-stat-value text-sm" id="tele-bio-status" style="font-size: 0.76rem; color: var(--accent);">Calibrando (0/250)</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Permanencia tecla</span>
+          <span class="tele-stat-value text-sm" id="tele-bio-dwell">—</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Pausa inter-tecla</span>
+          <span class="tele-stat-value text-sm" id="tele-bio-flight">—</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Consistencia</span>
+          <span class="tele-stat-value text-sm" id="tele-bio-similarity" style="color: var(--success); font-weight: 700;">—</span>
         </div>
       </div>
     </aside>
@@ -437,6 +463,45 @@
       <p class="text-sm text-muted" style="margin-top: 16px; text-align: center;">
         El guardado automático se activará en cuanto elijas una carpeta.
       </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: Huella Biométrica Establecida
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-biometrics-overlay">
+  <div class="modal" style="max-width: 500px;" role="dialog" aria-modal="true" aria-labelledby="modal-bio-title">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.3rem;">🎯</span>
+        <h3 id="modal-bio-title" style="margin: 0; font-size: 1rem;">¡Huella Digital de Escritura Calibrada!</h3>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="close-modal-bio" aria-label="Cerrar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
+        Hemos recogido suficiente información de tu <strong>dinámica de tecleo</strong> (tiempo de permanencia en cada tecla, pausas de vuelo entre pulsaciones y ritmo de digitación).
+      </p>
+      <div style="background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+        <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 10px;">
+          Parámetros Biométricos Registrados
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.84rem;">
+          <div>⏱️ <strong>Permanencia media:</strong> <br><span id="modal-bio-dwell" style="font-weight: 700; color: var(--accent);">0 ms</span></div>
+          <div>⏸️ <strong>Pausa inter-tecla:</strong> <br><span id="modal-bio-flight" style="font-weight: 700; color: var(--accent);">0 ms</span></div>
+          <div>⌨️ <strong>Muestra calibrada:</strong> <br><span id="modal-bio-samples" style="font-weight: 700;">250 pulsaciones</span></div>
+          <div>🔒 <strong>Estado:</strong> <br><span style="color: var(--success); font-weight: 700;">Huella Firmada en JSON</span></div>
+        </div>
+      </div>
+      <p style="font-size: 0.83rem; color: var(--text-muted); line-height: 1.4;">
+        Esta firma biométrica ha sido personalizada y guardada en tu archivo <code>documento.json</code>. Servirá para certificar ante el docente que tú eres siempre la persona que está redactando y construyendo el trabajo de forma continua.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary w-full" id="btn-confirm-bio" style="justify-content: center;">Continuar redactando</button>
     </div>
   </div>
 </div>
