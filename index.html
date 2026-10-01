@@ -478,7 +478,7 @@
      MODAL: Sin proyecto abierto (onboarding)
 ══════════════════════════════════════════════ -->
 <div class="modal-overlay open" id="modal-onboarding-overlay">
-  <div class="modal" style="max-width: 460px;" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+  <div class="modal" style="max-width: 480px;" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
     <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between;">
       <h3 id="onboarding-title" style="margin: 0;">Bienvenido a Eye on the Sky</h3>
       <button class="btn btn-ghost btn-sm btn-icon" id="close-modal-onboarding" title="Cerrar (continuar sin carpeta)" aria-label="Cerrar">
@@ -486,10 +486,10 @@
       </button>
     </div>
     <div class="modal-body">
-      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 16px;">
-        Esta aplicación guarda tu trabajo en una carpeta de tu computador. Todo permanece local — no se sube a ningún servidor.
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 14px;">
+        Esta aplicación guarda tu trabajo en tu propio dispositivo. Todo permanece privado — no se sube a ningún servidor.
       </p>
-      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 20px;">
+      <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 18px;">
         Para comenzar, elige qué quieres hacer:
       </p>
       <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -502,21 +502,39 @@
           Abrir carpeta de proyecto (autoguardado)
         </button>
 
-        <!-- Selector nativo infalible mediante label HTML -->
-        <label for="onboard-file-input" class="btn btn-ghost w-full" id="onboard-open-json" role="button" tabindex="0" style="justify-content: center; padding: 11px; border: 1px dashed var(--border); font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0; box-sizing: border-box; text-decoration: none;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>Abrir archivo .json individual</span>
-        </label>
-        <input type="file" id="onboard-file-input" accept=".json,application/json" style="position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px;" onchange="if(this.files &amp;&amp; this.files[0]) loadProjectFromJSONFile(this.files[0]);" />
+        <!-- Selector infalible para iPhone, Android y PC (input nativo superpuesto) -->
+        <div style="position: relative; width: 100%; border-radius: 8px; overflow: hidden;">
+          <div class="btn btn-ghost w-full" id="onboard-open-json-visual" style="justify-content: center; padding: 12px; border: 1.5px dashed var(--border); font-size: 0.84rem; display: flex; align-items: center; gap: 8px; box-sizing: border-box; pointer-events: none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Abrir archivo .json individual</span>
+          </div>
+          <input type="file" id="onboard-file-input" accept=".json,application/json,text/plain,*/*" title="Seleccionar archivo .json" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; margin: 0; padding: 0;" />
+        </div>
       </div>
 
-      <div style="margin-top: 14px; text-align: center;">
+      <!-- Respaldo móvil: Pegar texto JSON directamente -->
+      <details style="margin-top: 14px; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 0.8rem;">
+        <summary style="cursor: pointer; color: var(--accent); font-weight: 600; outline: none;">
+          📋 ¿Problemas al seleccionar en iPhone o Android? Pega tu código JSON aquí
+        </summary>
+        <div style="margin-top: 10px;">
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">
+            Si el explorador de tu teléfono no encuentra el archivo, abre tu archivo <code>.json</code> en cualquier visor o bloc de notas, copia el texto y pégalo abajo:
+          </p>
+          <textarea id="paste-json-textarea" class="form-input" rows="4" placeholder='{"metadata":{"title":"..."},"content":{...}}' style="font-family: monospace; font-size: 0.74rem; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+          <button type="button" class="btn btn-sm btn-primary w-full" id="btn-load-pasted-json" style="margin-top: 8px; justify-content: center;">
+            Cargar proyecto desde texto pegado
+          </button>
+        </div>
+      </details>
+
+      <div style="margin-top: 12px; text-align: center;">
         <span style="font-size: 0.76rem; color: var(--text-muted);">o arrastra y suelta tu archivo <code>.json</code> directamente sobre esta ventana</span>
       </div>
 
-      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); text-align: center;">
+      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); text-align: center;">
         <span class="text-sm text-muted">¿Deseas auditar y analizar entregas en lote?</span><br>
-        <a href="dashboard.html" style="display: inline-block; margin-top: 6px; font-weight: 600; font-size: 0.84rem; color: var(--accent); text-decoration: none;">
+        <a href="dashboard.html" style="display: inline-block; margin-top: 4px; font-weight: 600; font-size: 0.84rem; color: var(--accent); text-decoration: none;">
           ➔ Ir al Panel Docente (Dashboard)
         </a>
       </div>
