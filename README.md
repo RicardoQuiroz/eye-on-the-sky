@@ -172,13 +172,17 @@ La interfaz del estudiante se encuentra en [`index.html`](file:///d:/Git/app-eye
 
 ### 📁 5.1. Abrir o Crear Carpeta / Archivo de Trabajo
 
-Al ingresar, una ventana de bienvenida ofrece opciones flexibles:
-- 🆕 **Crear nuevo proyecto:** Permite seleccionar una carpeta local vacía. El editor crea automáticamente la subcarpeta `capturas/` y el archivo `documento.json`.
-- 📂 **Abrir carpeta existente:** Permite seleccionar la carpeta de un trabajo previo. La app detecta automáticamente cualquier archivo `.json` de Eye on the Sky presente en ella.
-- 📄 **Cargar archivo .json directamente:** Si el navegador no soporta File System Access API o prefieres trabajar con un archivo individual, puedes hacer clic en *"O cargar archivo JSON directamente"* para seleccionarlo desde el explorador de Windows/Mac.
+Al ingresar, una ventana de bienvenida ofrece opciones flexibles adaptadas a computadoras y teléfonos móviles:
+- 🆕 **Crear nuevo proyecto:** Permite seleccionar una carpeta local vacía (en navegadores de escritorio). El editor crea automáticamente la subcarpeta `capturas/` y el archivo `documento.json`.
+- 📂 **Abrir carpeta existente:** Abre la carpeta de un trabajo previo restaurando automáticamente cualquier archivo `.json` de Eye on the Sky encontrado en ella.
+- 📄 **Abrir archivo .json individual:** 
+  - **Compatibilidad 100% móvil y multiplataforma:** Diseñado con un selector nativo superpuesto compatible con **iPhone (iOS Safari)**, **Android (Chrome Mobile)** y **Windows/Mac/Linux**.
+  - Permite cargar el archivo desde la app *Archivos* de iOS, el explorador de descargas de Android, Google Drive o WhatsApp.
+  - Al seleccionar el archivo, el proyecto se restaura al instante y se guarda automáticamente en `localStorage` para proteger la sesión si el teléfono suspende o recarga la pestaña por falta de memoria.
+- 📋 **Opción de Rescate (Pegar código JSON):** Si el estudiante tiene dificultades navegando en el explorador de archivos de su teléfono, puede desplegar la sección *"¿Problemas al seleccionar en iPhone o Android?"*, pegar el texto del archivo `.json` directamente y cargarlo en un solo toque.
 
 > [!IMPORTANT]
-> **Permiso de acceso a archivos:** Cuando tu navegador (Chrome o Edge) te pregunte si deseas otorgar permisos de lectura y escritura a la carpeta, haz clic en **"Permitir"**. Esto habilita el autoguardado transparente en tu disco duro.
+> **Permiso de acceso a archivos (en computadoras):** Cuando tu navegador (Chrome o Edge) te pregunte si deseas otorgar permisos de lectura y escritura a la carpeta, haz clic en **"Permitir"**. En dispositivos móviles (iPhone y Android), el trabajo se autoguarda de forma continua y segura en el almacenamiento local del navegador (`localStorage`).
 
 ---
 
@@ -493,14 +497,12 @@ app-eye-on-the-sky/
 
 ## 🌐 9. Requisitos y Compatibilidad de Navegadores
 
-| Navegador | Soporte Editor (File System Access) | Soporte Dashboard Docente | Soporte Google Apps Script |
+| Dispositivo / Navegador | Soporte Editor (.json y Carpetas) | Autoguardado | Soporte Dashboard Docente |
 | :--- | :---: | :---: | :---: |
-| 🌐 **Google Chrome** (v86+) | 🟢 **100% Nativo** | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
-| 🌐 **Microsoft Edge** (v86+) | 🟢 **100% Nativo** | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
-| 🌐 **Brave Browser** | 🟢 **100% Nativo** | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
-| 🌐 **Opera** (v72+) | 🟢 **100% Nativo** | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
-| 🌐 **Mozilla Firefox** | 🟡 Modo Respaldo / Carga JSON | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
-| 🌐 **Apple Safari** | 🟡 Modo Respaldo / Carga JSON | 🟢 **100% Nativo** | 🟢 **100% Nativo** |
+| 💻 **Google Chrome / Edge en PC** | 🟢 **100% Nativo** (Carpetas locales y .json) | 🟢 Disco duro local (cada 30s) | 🟢 **100% Nativo** |
+| 📱 **Apple iPhone / iPad (iOS Safari)** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
+| 🤖 **Android (Chrome Mobile)** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
+| 🌐 **Mozilla Firefox / Safari en Mac** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
 
 ---
 
