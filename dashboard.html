@@ -35,6 +35,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
         Exportar reporte CSV
       </button>
+      <button class="btn btn-primary btn-sm" id="btn-open-email-modal" title="Estrategia y script para enviar reportes gráficos por correo a los estudiantes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        📧 Enviar correos (Apps Script)
+      </button>
     </div>
   </header>
 
@@ -122,6 +126,10 @@
             <p id="detail-doc-title" class="text-sm text-muted" style="margin-top: 2px;"></p>
           </div>
           <div class="flex gap-2">
+            <button class="btn btn-sm btn-ghost" id="detail-send-email-btn" title="Generar borrador de correo de retroalimentación para este estudiante">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              ✉️ Enviar correo
+            </button>
             <button class="btn btn-sm" id="detail-view-sources">Ver fuentes</button>
             <button class="btn btn-sm" id="detail-view-sessions">Ver sesiones</button>
             <button class="btn btn-ghost btn-sm btn-icon" id="close-student-detail">
@@ -141,6 +149,146 @@
 
   </div><!-- /#dash-content -->
 </div><!-- /#dashboard-app -->
+
+<!-- ══════════════════════════════════════════════
+     MODAL: ENVÍO MASIVO DE REPORTES VÍA GOOGLE APPS SCRIPT
+══════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-email-apps-script" role="dialog" aria-modal="true" aria-labelledby="modal-email-title">
+  <div class="modal" style="max-width: 780px; max-height: 90vh; overflow-y: auto;">
+    
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+      <div>
+        <h2 id="modal-email-title" style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          <span>📧</span> Envío Masivo de Reportes Gráficos (Google Sheets + Apps Script)
+        </h2>
+        <p class="text-sm text-muted" style="margin-top: 4px;">
+          Estrategia sin servidor SMTP: Utiliza tu Google Sheets existente y el motor de Gmail para enviar correos visuales y personalizados a cada estudiante sin costo ni configuración de servidores.
+        </p>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-icon" id="close-modal-email" aria-label="Cerrar ventana">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Pasos de configuración -->
+    <div style="background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+      <h3 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; color: var(--primary);">
+        🚀 Flujo de Trabajo en 4 Pasos:
+      </h3>
+      <ol style="margin: 0; padding-left: 20px; font-size: 0.83rem; line-height: 1.6; color: var(--text-main);">
+        <li>
+          <strong>Exporta el CSV del Dashboard:</strong> Haz clic en el botón <em>"Exportar reporte CSV"</em> en este panel docente.
+        </li>
+        <li>
+          <strong>Importa o pega en tu Google Sheets:</strong> Abre tu Google Sheets donde tienes la lista de estudiantes e importa el archivo CSV (o copia y pega sus filas). Asegúrate de tener una columna llamada <code>Correo</code> o <code>Email</code> con los correos de tus estudiantes.
+        </li>
+        <li>
+          <strong>Pega el script en Google Sheets:</strong> En tu Google Sheets, ve a <code>Extensiones &gt; Apps Script</code>, borra el código que aparezca y pega el script provisto abajo. Guarda con <kbd>Ctrl+S</kbd>.
+        </li>
+        <li>
+          <strong>Envía con un clic:</strong> Recarga tu hoja de cálculo (<kbd>F5</kbd>). Verás un nuevo menú superior llamado <strong>🎓 Eye on the Sky</strong>. Elige <strong>"📧 Enviar reportes gráficos a estudiantes"</strong>.
+        </li>
+      </ol>
+    </div>
+
+    <!-- Acciones del Script -->
+    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+      <button class="btn btn-primary" id="btn-copy-apps-script">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar código de Apps Script
+      </button>
+      <a href="codigo_apps_script.gs" download="codigo_apps_script.gs" class="btn btn-sm btn-ghost" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar archivo .gs
+      </a>
+      <span class="text-sm text-muted" style="margin-left: auto;">Archivo local: <code>codigo_apps_script.gs</code></span>
+    </div>
+
+    <!-- Previsualización del diseño del correo gráfico que recibirá el estudiante -->
+    <div style="margin-top: 18px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+      <div style="background: var(--bg-surface); padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
+        <span>👁️ VISTA PREVIA: Correo gráfico que recibirá cada estudiante</span>
+        <span style="font-size: 0.72rem; color: var(--success); font-weight: 600;">HTML Responsive (Gmail, Outlook, Móviles)</span>
+      </div>
+      <div style="background: #f1f5f9; padding: 20px; max-height: 380px; overflow-y: auto;">
+        
+        <!-- Tarjeta simulada de correo HTML -->
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+          
+          <!-- Banner -->
+          <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 22px 24px; color: #ffffff;">
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">Auditoría de Manuscrito Académico</div>
+            <h3 style="margin: 0; font-size: 18px; color: #ffffff; font-weight: 700;">🛰️ Eye on the Sky — Reporte de Avance</h3>
+            <div style="margin-top: 6px; font-size: 12px; color: #cbd5e1;">Evaluación de telemetría, biometría de redacción y consistencia científica</div>
+          </div>
+
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; line-height: 1.5; margin: 0 0 16px;">
+              Estimado/a <strong>Camila Morales Flores</strong>,<br>
+              A continuación presentamos el resumen de telemetría y verificación de proceso incremental de tu documento <em>"Impacto del cambio climático en los humedales altoandinos"</em>.
+            </p>
+
+            <!-- Barra de Redacción Manual -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
+                <span>Tasa de Escritura Manual</span>
+                <span style="color: #16a34a; font-size: 13px;">96% Manual</span>
+              </div>
+              <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden;">
+                <div style="width: 96%; height: 100%; background: #16a34a; border-radius: 99px;"></div>
+              </div>
+            </div>
+
+            <!-- Mini Grid de Métricas -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 800; color: #2563eb;">2,145</div>
+                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Palabras en documento</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 800; color: #16a34a;">4 sesiones</div>
+                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">En 3 días de trabajo</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 800; color: #16a34a;">96%</div>
+                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Huella biométrica autor</div>
+              </div>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 800; color: #16a34a;">6 / 6</div>
+                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Fuentes con captura</div>
+              </div>
+            </div>
+
+            <!-- Diagnóstico -->
+            <div style="padding: 10px 14px; background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px; font-size: 12px; color: #15803d; line-height: 1.5;">
+              <strong>Diagnóstico docente:</strong> Proceso de redacción incremental continuo y regular. Sin alertas anómalas de pegado masivo ni discrepancias en la autoría de tecleo. ¡Buen trabajo!
+            </div>
+
+          </div>
+
+          <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 24px; font-size: 11px; color: #94a3b8; text-align: center;">
+            Reporte generado automáticamente mediante Eye on the Sky &amp; Google Apps Script.
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bloque de código con scroll -->
+    <div style="margin-top: 16px;">
+      <details>
+        <summary style="cursor: pointer; font-size: 0.84rem; font-weight: 600; color: var(--text-muted); padding: 6px 0;">
+          ▶ Ver / copiar código fuente de Apps Script directamente aquí
+        </summary>
+        <div class="code-preview-box" style="margin-top: 8px;">
+          <pre><code id="code-snippet-apps-script">// Cargando código de Apps Script...</code></pre>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</div>
 
 <div id="toast-container"></div>
 
