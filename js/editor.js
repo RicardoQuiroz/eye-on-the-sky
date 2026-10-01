@@ -50,6 +50,15 @@ const App = {
         sources_with_screenshot: 0,
         sources_cited_in_text:   0,
       }
+    },
+    biometrics: {
+      baseline: null,
+      session_metrics: {
+        samples: 0,
+        mean_dwell_ms: 0,
+        mean_flight_ms: 0,
+        similarity_score: 100,
+      }
     }
   },
 
@@ -68,6 +77,15 @@ const App = {
     autosave_ref:      null,
     previousWordCount: 0,  // para calcular diff de palabras real
     isPasting:         false, // flag para text-change: ignorar palabras de paste
+    passedMilestones:  new Set(),
+    biometrics: {
+      activeKeyDowns: new Map(),
+      lastKeyUpTime:  0,
+      samples:        [],
+      spaceDwells:    [],
+      backspaceDwells: [],
+      notifiedBaseline: false,
+    }
   },
 
   // Flags de UI
@@ -86,15 +104,303 @@ const App = {
 };
 
 /* ================================================================
+   MOTOR DE SONIDOS Y GAMIFICACIÓN (SoundFx)
+   ================================================================ */
+
+const SoundFx = {
+  enabled: localStorage.getItem('eots-sound-enabled') !== 'false',
+  files: {
+    session_start:   'Sounds/session_start.mp3',
+    milestone_words: 'Sounds/milestone_words.mp3',
+    source_captured: 'Sounds/citation_success.mp3',
+    autosave_peace:  'Sounds/calibration_complete.mp3',
+    paste_alert:     'Sounds/paste_warning.mp3',
+    export_success:  'Sounds/calibration_complete.mp3',
+  },
+  audioCache: {},
+
+  init() {
+    for (const [key, path] of Object.entries(this.files)) {
+      try {
+        const audio = new Audio();
+        audio.src = path;
+        audio.preload = 'none'; // No forzar precarga en conexiones móviles
+        this.audioCache[key] = audio;
+      } catch (err) {
+        console.debug('No se pudo inicializar audio:', key, err);
+      }
+    }
+    this.updateUI();
+  },
+
+  play(name) {
+    if (!this.enabled || !this.files[name]) return;
+    try {
+      const base = this.audioCache[name];
+      if (!base) return;
+      const sound = base.cloneNode();
+      sound.volume = 0.45;
+      const promise = sound.play();
+      if (promise !== undefined) {
+        promise.catch(() => {
+          // Silenciar advertencia de política de autoplay en móviles
+        });
+      }
+    } catch (e) {
+      // Ignorar bloqueos de audio móvil
+    }
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    localStorage.setItem('eots-sound-enabled', String(this.enabled));
+    this.updateUI();
+    if (this.enabled) {
+      this.play('autosave_peace');
+      showToast('Efectos de sonido activados.', 'info');
+    } else {
+      showToast('Efectos de sonido silenciados.', 'info');
+    }
+  },
+
+  updateUI() {
+    const btn = document.getElementById('btn-sound-toggle');
+    const iconOn = document.getElementById('sound-icon-on');
+    const iconOff = document.getElementById('sound-icon-off');
+    if (btn) btn.title = this.enabled ? 'Efectos de sonido (Activados)' : 'Efectos de sonido (Silenciados)';
+    if (iconOn) iconOn.classList.toggle('hidden', !this.enabled);
+    if (iconOff) iconOff.classList.toggle('hidden', this.enabled);
+  }
+};
+
+/* ================================================================
+   MOTOR DE BIOMETRÍA DE ESCRITURA Y DINÁMICA DE TECLEO
+   ================================================================ */
+
+const BiometricsEngine = {
+  REQUIRED_SAMPLES: 250,
+
+  onKeyDown(e) {
+    if (['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return;
+    const now = performance.now();
+    const keyId = e.code || e.key;
+    if (!App.session.biometrics.activeKeyDowns.has(keyId)) {
+      App.session.biometrics.activeKeyDowns.set(keyId, { time: now, key: e.key });
+    }
+  },
+
+  onKeyUp(e) {
+    if (['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return;
+    const now = performance.now();
+    const keyId = e.code || e.key;
+    const downRec = App.session.biometrics.activeKeyDowns.get(keyId);
+    if (!downRec) return;
+    App.session.biometrics.activeKeyDowns.delete(keyId);
+
+    const dwell = now - downRec.time; // Hold time en ms
+    if (dwell < 15 || dwell > 900) return; // filtrar rebotes anómalos o teclas atascadas
+
+    let flight = null;
+    if (App.session.biometrics.lastKeyUpTime > 0) {
+      flight = downRec.time - App.session.biometrics.lastKeyUpTime;
+    }
+    App.session.biometrics.lastKeyUpTime = now;
+
+    // Solo considerar pausas de ritmo de tipeo normales (10ms a 2500ms)
+    const validFlight = (flight !== null && flight >= 10 && flight <= 2500) ? flight : null;
+
+    App.session.biometrics.samples.push({
+      dwell,
+      flight: validFlight,
+      key: e.key,
+      time: Date.now()
+    });
+
+    if (e.key === ' ') App.session.biometrics.spaceDwells.push(dwell);
+    if (e.key === 'Backspace') App.session.biometrics.backspaceDwells.push(dwell);
+
+    this.process();
+  },
+
+  process() {
+    const samples = App.session.biometrics.samples;
+    const count = samples.length;
+    const baseline = App.project.biometrics?.baseline;
+
+    if (!baseline) {
+      // Fase de calibración
+      const dwellValues = samples.map(s => s.dwell);
+      const flightValues = samples.filter(s => s.flight !== null).map(s => s.flight);
+
+      const meanD = dwellValues.length ? (dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length) : 0;
+      const meanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : 0;
+
+      const statusEl = document.getElementById('tele-bio-status');
+      const dwellEl  = document.getElementById('tele-bio-dwell');
+      const flightEl = document.getElementById('tele-bio-flight');
+      const simEl    = document.getElementById('tele-bio-similarity');
+
+      if (statusEl) statusEl.textContent = `Calibrando (${count}/${this.REQUIRED_SAMPLES})`;
+      if (dwellEl)  dwellEl.textContent  = meanD ? `${Math.round(meanD)} ms` : '—';
+      if (flightEl) flightEl.textContent = meanF ? `${Math.round(meanF)} ms` : '—';
+      if (simEl)    simEl.textContent    = 'En curso';
+
+      // ¿Se alcanzó la muestra requerida?
+      if (count >= this.REQUIRED_SAMPLES && !App.session.biometrics.notifiedBaseline) {
+        this.calibrateBaseline(samples, dwellValues, flightValues);
+      }
+    } else {
+      // Huella establecida: verificación continua de identidad
+      this.verifySession(samples, baseline);
+    }
+  },
+
+  calibrateBaseline(samples, dwellValues, flightValues) {
+    App.session.biometrics.notifiedBaseline = true;
+
+    const meanD = dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length;
+    const varianceD = dwellValues.reduce((sum, v) => sum + Math.pow(v - meanD, 2), 0) / dwellValues.length;
+    const stdD = Math.sqrt(varianceD);
+
+    const meanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : 150;
+    const varianceF = flightValues.length ? (flightValues.reduce((sum, v) => sum + Math.pow(v - meanF, 2), 0) / flightValues.length) : 400;
+    const stdF = Math.sqrt(varianceF);
+
+    const spaceMean = App.session.biometrics.spaceDwells.length
+      ? App.session.biometrics.spaceDwells.reduce((a,b)=>a+b,0) / App.session.biometrics.spaceDwells.length
+      : meanD;
+
+    const backspaceMean = App.session.biometrics.backspaceDwells.length
+      ? App.session.biometrics.backspaceDwells.reduce((a,b)=>a+b,0) / App.session.biometrics.backspaceDwells.length
+      : meanD;
+
+    App.project.biometrics.baseline = {
+      established_at:     new Date().toISOString(),
+      sample_size:        samples.length,
+      mean_dwell_ms:      Math.round(meanD * 10) / 10,
+      std_dwell_ms:       Math.round(stdD * 10) / 10,
+      mean_flight_ms:     Math.round(meanF * 10) / 10,
+      std_flight_ms:      Math.round(stdF * 10) / 10,
+      space_dwell_ms:     Math.round(spaceMean * 10) / 10,
+      backspace_dwell_ms: Math.round(backspaceMean * 10) / 10,
+    };
+
+    App.project.biometrics.session_metrics = {
+      samples: samples.length,
+      mean_dwell_ms: Math.round(meanD * 10) / 10,
+      mean_flight_ms: Math.round(meanF * 10) / 10,
+      similarity_score: 100
+    };
+
+    // Actualizar campos del modal
+    const mDwell = document.getElementById('modal-bio-dwell');
+    const mFlight = document.getElementById('modal-bio-flight');
+    const mSamples = document.getElementById('modal-bio-samples');
+    if (mDwell)   mDwell.textContent   = `${Math.round(meanD)} ms`;
+    if (mFlight)  mFlight.textContent  = `${Math.round(meanF)} ms`;
+    if (mSamples) mSamples.textContent = `${samples.length} pulsaciones`;
+
+    // Abrir modal notificando al usuario
+    openModal('modal-biometrics-overlay');
+
+    // Reproducir sonido de hito
+    SoundFx.play('milestone_words');
+
+    this.updateUI();
+
+    // Guardar para asentar la huella en el JSON inmediatamente
+    saveProject();
+  },
+
+  verifySession(samples, baseline) {
+    if (samples.length < 25) return;
+
+    const dwellValues = samples.map(s => s.dwell);
+    const flightValues = samples.filter(s => s.flight !== null).map(s => s.flight);
+
+    const sessMeanD = dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length;
+    const sessMeanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : baseline.mean_flight_ms;
+
+    // Distancia normalizada
+    const zD = Math.abs(sessMeanD - baseline.mean_dwell_ms) / Math.max(baseline.std_dwell_ms || 20, 10);
+    const zF = Math.abs(sessMeanF - baseline.mean_flight_ms) / Math.max(baseline.std_flight_ms || 35, 15);
+    const dist = 0.5 * zD + 0.5 * zF;
+
+    const similarity = Math.max(0, Math.min(100, Math.round(100 - (dist * 20))));
+
+    App.project.biometrics.session_metrics = {
+      samples: samples.length,
+      mean_dwell_ms: Math.round(sessMeanD * 10) / 10,
+      mean_flight_ms: Math.round(sessMeanF * 10) / 10,
+      similarity_score: similarity
+    };
+
+    this.updateUI();
+  },
+
+  updateUI() {
+    const baseline = App.project.biometrics?.baseline;
+    const statusEl = document.getElementById('tele-bio-status');
+    const dwellEl  = document.getElementById('tele-bio-dwell');
+    const flightEl = document.getElementById('tele-bio-flight');
+    const simEl    = document.getElementById('tele-bio-similarity');
+
+    if (baseline) {
+      if (statusEl) {
+        statusEl.textContent = '✓ Calibrada';
+        statusEl.style.color = 'var(--success)';
+      }
+      const sm = App.project.biometrics.session_metrics;
+      if (dwellEl)  dwellEl.textContent  = `${sm?.mean_dwell_ms || baseline.mean_dwell_ms} ms`;
+      if (flightEl) flightEl.textContent = `${sm?.mean_flight_ms || baseline.mean_flight_ms} ms`;
+      if (simEl) {
+        const score = sm?.similarity_score ?? 100;
+        simEl.textContent = `${score}%`;
+        if (score >= 75) {
+          simEl.style.color = 'var(--success)';
+        } else if (score >= 60) {
+          simEl.style.color = 'var(--warning)';
+        } else {
+          simEl.style.color = 'var(--danger)';
+        }
+      }
+    } else {
+      if (statusEl) {
+        const cnt = App.session.biometrics.samples.length;
+        statusEl.textContent = `Calibrando (${cnt}/${this.REQUIRED_SAMPLES})`;
+        statusEl.style.color = 'var(--accent)';
+      }
+    }
+  }
+};
+
+/* ================================================================
    INICIALIZACIÓN
    ================================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
+  SoundFx.init();
   initQuill();
   initEventListeners();
   initSessionTimer();
   restoreTheme();
+  checkAndRestoreActiveProject();
 });
+
+function checkAndRestoreActiveProject() {
+  const saved = localStorage.getItem('eots_active_project');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed && (parsed.content || parsed.metadata)) {
+        const name = localStorage.getItem('eots_active_project_name') || 'documento.json';
+        loadProjectFromParsedJSON(parsed, name);
+      }
+    } catch (e) {
+      console.debug('No se pudo restaurar sesión activa de localStorage:', e);
+    }
+  }
+}
 
 function initQuill() {
   App.quill = new Quill('#quill-editor', {
@@ -120,12 +426,24 @@ function initQuill() {
       App.session.words_typed += wordDiff;
     }
 
+    // Hitos de palabras para gamificación (100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000)
+    const milestones = [100, 250, 500, 750, 1000, 1500, 2000, 2500, 3000, 5000];
+    for (const m of milestones) {
+      if (currentWC >= m && !App.session.passedMilestones.has(m)) {
+        App.session.passedMilestones.add(m);
+        if (!App.session.isPasting) {
+          SoundFx.play('milestone_words');
+          showToast(`🎯 ¡Hito alcanzado: ${m} palabras escritas!`, 'success');
+        }
+      }
+    }
+
     App.session.previousWordCount = currentWC;
     updateWordCount(currentWC);
     updateTelemetryUI();
   });
 
-  // Activar corrector ortográfico nativo del navegador en español
+  // Activar corrector ortográfico nativo del navegador en español y eventos biométricos
   const editorEl = document.querySelector('#quill-editor .ql-editor');
   if (editorEl) {
     editorEl.setAttribute('spellcheck', 'true');
@@ -133,6 +451,7 @@ function initQuill() {
     editorEl.setAttribute('autocorrect', 'on');
     editorEl.addEventListener('paste', handlePasteEvent);
     editorEl.addEventListener('keydown', handleKeystrokeEvent);
+    editorEl.addEventListener('keyup', handleKeyUpEvent);
   }
 }
 
@@ -147,10 +466,19 @@ function handlePasteEvent(e) {
 
   // ¿El documento estaba vacío antes del pegado?
   const isInitialPaste = App.session.previousWordCount === 0;
+  const range = App.quill ? App.quill.getSelection(true) : null;
+  const pasteIndex = range ? range.index : 0;
 
   // Activar flag para que text-change no cuente estas palabras como manuales
   App.session.isPasting = true;
-  setTimeout(() => { App.session.isPasting = false; }, 300);
+  setTimeout(() => {
+    App.session.isPasting = false;
+    // Aplicar color de procedencia en Quill según el tipo de pegado
+    if (App.quill && chars > 0) {
+      const bgColor = isInitialPaste ? 'rgba(74, 108, 247, 0.16)' : 'rgba(229, 57, 53, 0.18)';
+      App.quill.formatText(pasteIndex, chars, 'background', bgColor);
+    }
+  }, 80);
 
   const pasteRecord = {
     timestamp:    new Date().toISOString(),
@@ -164,6 +492,7 @@ function handlePasteEvent(e) {
   if (!isInitialPaste) {
     // Solo penalizar pastes que no son el inicial
     App.session.chars_pasted += chars;
+    SoundFx.play('paste_alert');
   } else {
     showToast('Pegado inicial registrado sin penalización.', 'success');
   }
@@ -176,8 +505,16 @@ function handleKeystrokeEvent(e) {
   const ignore = ['Control','Alt','Shift','Meta','CapsLock','Tab','Escape',
     'ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown',
     'F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
-  if (ignore.includes(e.key)) return;
-  App.session.keystroke_count++;
+  if (!ignore.includes(e.key)) {
+    App.session.keystroke_count++;
+  }
+  // Procesar dinámica de pulsación para huella biométrica
+  BiometricsEngine.onKeyDown(e);
+}
+
+function handleKeyUpEvent(e) {
+  // Medir permanencia y pausas entre teclas para la huella biométrica
+  BiometricsEngine.onKeyUp(e);
 }
 
 function initSessionTimer() {
@@ -309,6 +646,17 @@ function startProjectSession() {
   App.session.keystroke_count = 0;
   App.session.initial_word_count = currentWC;
   App.session.previousWordCount = currentWC;
+  App.session.passedMilestones = new Set();
+
+  // Inicializar o reiniciar telemetría biométrica para la nueva sesión
+  App.session.biometrics = {
+    activeKeyDowns:   new Map(),
+    lastKeyUpTime:    0,
+    samples:          [],
+    spaceDwells:      [],
+    backspaceDwells:  [],
+    notifiedBaseline: !!(App.project.biometrics && App.project.biometrics.baseline),
+  };
 
   // Reconstruir conjunto de fechas activas
   App.session.active_days_set = new Set(
@@ -317,6 +665,7 @@ function startProjectSession() {
   App.session.active_days_set.add(now.toISOString().split('T')[0]);
 
   updateTelemetryUI();
+  BiometricsEngine.updateUI();
 }
 
 async function createNewProject(dirHandle) {
@@ -327,12 +676,37 @@ async function createNewProject(dirHandle) {
 
   startProjectSession();
   await saveProject();
+  SoundFx.play('session_start');
   showToast('Proyecto creado. El autoguardado está activo.', 'success');
 }
 
 async function loadExistingProject(dirHandle) {
   try {
-    const jsonHandle = await dirHandle.getFileHandle('documento.json');
+    let jsonHandle = null;
+    let loadedFileName = 'documento.json';
+
+    // 1. Intentar abrir documento.json estándar
+    try {
+      jsonHandle = await dirHandle.getFileHandle('documento.json');
+    } catch (e) {
+      // 2. Si no existe documento.json, buscar si hay algún archivo .json en la carpeta
+      if ('values' in dirHandle) {
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+            jsonHandle = entry;
+            loadedFileName = entry.name;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!jsonHandle) {
+      // No hay ningún archivo .json en la carpeta → es una carpeta nueva
+      await createNewProject(dirHandle);
+      return;
+    }
+
     const file   = await jsonHandle.getFile();
     const text   = await file.text();
     const parsed = JSON.parse(text);
@@ -349,6 +723,11 @@ async function loadExistingProject(dirHandle) {
     // Cargar datos
     App.project = { ...App.project, ...parsed };
     delete App.project._signature;
+
+    // Asegurar estructura biométrica
+    if (!App.project.biometrics) {
+      App.project.biometrics = { baseline: null, session_metrics: null };
+    }
 
     // Restaurar contenido en Quill
     if (App.project.content && App.project.content.delta) {
@@ -373,17 +752,159 @@ async function loadExistingProject(dirHandle) {
     // Guardar para registrar la apertura de la nueva sesión
     await saveProject();
 
-    showToast(`Proyecto "${App.project.metadata.title || 'Sin título'}" cargado.`, 'success');
+    SoundFx.play('session_start');
+    showToast(`Proyecto "${App.project.metadata.title || loadedFileName}" cargado.`, 'success');
     updateSaveStatus('saved');
+    BiometricsEngine.updateUI();
 
   } catch (err) {
-    if (err.name === 'NotFoundError') {
-      // No existe documento.json → es una carpeta nueva
-      await createNewProject(dirHandle);
-    } else {
-      throw err;
+    console.error('Error al cargar proyecto de carpeta:', err);
+    throw err;
+  }
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result || '');
+      reader.onerror = (e) => {
+        if (file && typeof file.text === 'function') {
+          file.text().then(resolve).catch(reject);
+        } else {
+          reject(e);
+        }
+      };
+      reader.readAsText(file);
+    } catch (err) {
+      if (file && typeof file.text === 'function') {
+        file.text().then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    }
+  });
+}
+
+async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') {
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('El archivo no contiene un formato JSON válido.');
+  }
+
+  // Verificar firma de integridad si existe
+  const storedSig = parsed._signature;
+  if (storedSig) {
+    try {
+      const valid = await verifySignature(parsed);
+      if (!valid) {
+        showToast('⚠ El archivo JSON fue modificado externamente. Firma alterada.', 'warning');
+      }
+    } catch (e) {
+      console.debug('Error en validación de firma:', e);
     }
   }
+
+  App.project = { ...App.project, ...parsed };
+  delete App.project._signature;
+
+  if (!App.project.metadata) {
+    App.project.metadata = { title: (sourceName || 'documento').replace('.json', '') };
+  }
+
+  if (!App.project.biometrics) {
+    App.project.biometrics = { baseline: null, session_metrics: null };
+  }
+
+  if (!Array.isArray(App.project.sources)) {
+    App.project.sources = [];
+  }
+
+  // Restaurar contenido en Quill de forma segura
+  if (App.quill) {
+    try {
+      if (App.project.content && App.project.content.delta) {
+        App.quill.setContents(App.project.content.delta, 'silent');
+      } else if (App.project.content && App.project.content.html) {
+        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
+      }
+    } catch (quillErr) {
+      console.warn('Error al cargar delta en Quill, usando HTML plano:', quillErr);
+      if (App.project.content && App.project.content.html) {
+        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
+      }
+    }
+  }
+
+  const titleInput = document.getElementById('doc-title-input');
+  if (titleInput) titleInput.value = App.project.metadata.title || '';
+
+  renderSourcesList();
+
+  const currentWC = countWords(App.quill ? App.quill.getText() : '');
+  updateWordCount(currentWC);
+  startProjectSession();
+
+  App.ui.projectLoaded = true;
+
+  const sbName = document.getElementById('sb-project-name');
+  if (sbName) sbName.textContent = sourceName;
+  const folderLabel = document.getElementById('open-folder-label');
+  if (folderLabel) folderLabel.textContent = sourceName.slice(0, 16) + '…';
+
+  // Guardar en localStorage para que en móviles (Android / iOS) si se recarga la pestaña, se restaure sin modal
+  try {
+    localStorage.setItem('eots_active_project', JSON.stringify(parsed));
+    localStorage.setItem('eots_active_project_name', sourceName);
+  } catch (storageErr) {
+    console.debug('No se pudo guardar respaldo en localStorage:', storageErr);
+  }
+
+  // Cerrar siempre el modal de bienvenida
+  closeModal('modal-onboarding-overlay');
+
+  try {
+    SoundFx.play('session_start');
+  } catch (e) {}
+
+  showToast(`✓ Proyecto "${App.project.metadata.title || sourceName}" cargado exitosamente.`, 'success');
+  updateSaveStatus('saved');
+  if (BiometricsEngine.updateUI) BiometricsEngine.updateUI();
+}
+
+async function loadProjectFromJSONFile(file) {
+  if (!file) return;
+  showToast('Cargando documento...', 'info');
+
+  try {
+    const text = await readFileAsText(file);
+    if (!text || !text.trim()) {
+      throw new Error('El archivo seleccionado está vacío.');
+    }
+    const parsed = JSON.parse(text);
+    await loadProjectFromParsedJSON(parsed, file.name || 'documento.json');
+  } catch (err) {
+    console.error('Error al cargar archivo JSON:', err);
+    showToast('Error al abrir el JSON: ' + err.message, 'error');
+  }
+}
+
+async function loadProjectFromJSONText(text, sourceName = 'documento_pegado.json') {
+  if (!text || !text.trim()) {
+    showToast('Por favor pega el contenido de tu archivo JSON en el recuadro.', 'warning');
+    return;
+  }
+  try {
+    const parsed = JSON.parse(text.trim());
+    await loadProjectFromParsedJSON(parsed, sourceName);
+  } catch (err) {
+    console.error('Error al parsear texto JSON:', err);
+    showToast('El texto pegado no es un JSON válido: ' + err.message, 'error');
+  }
+}
+
+async function openJsonFileDialog() {
+  const input = document.getElementById('onboard-file-input') || document.getElementById('input-load-json-direct');
+  if (input) input.click();
 }
 
 /* ================================================================
@@ -399,18 +920,21 @@ function startAutosave() {
 }
 
 async function saveProject() {
-  if (!App.dirHandle) return;
-
   updateSaveStatus('saving');
 
   try {
     // Capturar estado actual del editor
-    App.project.content.delta = App.quill.getContents();
-    App.project.content.html  = App.quill.root.innerHTML;
-    App.project.metadata.title = document.getElementById('doc-title-input').value.trim() || 'Sin título';
+    if (App.quill) {
+      App.project.content.delta = App.quill.getContents();
+      App.project.content.html  = App.quill.root.innerHTML;
+    }
+    const titleInput = document.getElementById('doc-title-input');
+    if (titleInput) {
+      App.project.metadata.title = titleInput.value.trim() || App.project.metadata?.title || 'Sin título';
+    }
     App.project.metadata.last_saved = new Date().toISOString();
 
-    const currentWC = countWords(App.quill.getText());
+    const currentWC = countWords(App.quill ? App.quill.getText() : '');
     const now = new Date();
     const startTime = App.session.start_time || now;
     const durationMin = Math.max(1, Math.round((now.getTime() - startTime.getTime()) / 60000));
@@ -441,6 +965,13 @@ async function saveProject() {
       chars_pasted:       App.session.chars_pasted,
       paste_events:       [...App.session.paste_events],
       keystroke_count:    App.session.keystroke_count,
+      biometrics: {
+        samples:          App.session.biometrics?.samples?.length || 0,
+        mean_dwell_ms:    App.project.biometrics?.session_metrics?.mean_dwell_ms || 0,
+        mean_flight_ms:   App.project.biometrics?.session_metrics?.mean_flight_ms || 0,
+        similarity_score: App.project.biometrics?.session_metrics?.similarity_score ?? (App.project.biometrics?.baseline ? 100 : null),
+        is_consistent:    (App.project.biometrics?.session_metrics?.similarity_score ?? 100) >= 65,
+      },
     };
 
     // Actualizar o agregar la sesión activa en el historial de sesiones
@@ -483,13 +1014,22 @@ async function saveProject() {
     // Agregar firma de integridad
     payload._signature = await signPayload(payload);
 
-    const json = JSON.stringify(payload, null, 2);
+    // Persistir siempre en localStorage (para móviles y sesiones sin carpeta)
+    try {
+      localStorage.setItem('eots_active_project', JSON.stringify(payload));
+      localStorage.setItem('eots_active_project_name', App.project.metadata.title || 'documento.json');
+    } catch (storageErr) {
+      console.debug('Error guardando en localStorage:', storageErr);
+    }
 
-    // Escribir al archivo
-    const fileHandle = await App.dirHandle.getFileHandle('documento.json', { create: true });
-    const writable   = await fileHandle.createWritable();
-    await writable.write(json);
-    await writable.close();
+    // Si hay carpeta de trabajo conectada (Chrome/Edge en PC), guardar físicamente en disco
+    if (App.dirHandle) {
+      const json = JSON.stringify(payload, null, 2);
+      const fileHandle = await App.dirHandle.getFileHandle('documento.json', { create: true });
+      const writable   = await fileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+    }
 
     App.ui.isDirty = false;
     updateSaveStatus('saved', App.project.metadata.last_saved);
@@ -625,6 +1165,7 @@ async function saveSource() {
   updateTelemetryUI();
   App.ui.isDirty = true;
   updateSaveStatus('unsaved');
+  SoundFx.play('source_captured');
   showToast('Fuente guardada correctamente.', 'success');
 }
 
@@ -796,6 +1337,7 @@ function insertCitationIntoEditor() {
   // Insertar en la posición actual del cursor
   const range = App.quill.getSelection(true);
   App.quill.insertText(range.index, citation, 'user');
+  App.quill.formatText(range.index, citation.length, 'background', 'rgba(139, 92, 246, 0.20)');
   App.quill.setSelection(range.index + citation.length);
 
   // Marcar fuente como citada
@@ -921,6 +1463,7 @@ async function fetchDOI() {
 
 // --- PDF (usa el CSS de impresión definido en styles.css) ---
 function exportToPDF() {
+  SoundFx.play('export_success');
   window.print();
 }
 
@@ -970,6 +1513,7 @@ async function exportToDocx() {
 
   const blob = await Packer.toBlob(doc);
   downloadBlob(blob, `${slugify(title)}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  SoundFx.play('export_success');
   showToast('Documento Word exportado.', 'success');
 }
 
@@ -1006,6 +1550,7 @@ function exportToRIS() {
   const blob = new Blob([ris], { type: 'application/x-research-info-systems' });
   const title = App.project.metadata.title || 'documento';
   downloadBlob(blob, `${slugify(title)}_bibliografia.ris`, 'application/x-research-info-systems');
+  SoundFx.play('export_success');
   showToast('Bibliografía exportada en formato RIS (compatible con Zotero).', 'success');
 }
 
@@ -1017,6 +1562,7 @@ async function exportJSON() {
   const blob  = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const title = App.project.metadata.title || 'documento';
   downloadBlob(blob, `${slugify(title)}_respaldo.json`, 'application/json');
+  SoundFx.play('export_success');
   showToast('Copia del proyecto descargada.', 'success');
 }
 
@@ -1113,6 +1659,69 @@ function initEventListeners() {
   document.getElementById('onboard-new').addEventListener('click', () => openOrCreateProject('new'));
   document.getElementById('onboard-open').addEventListener('click', () => openOrCreateProject('open'));
 
+  // Cerrar modal de onboarding con botón ✕ (continuar sin carpeta)
+  const btnCloseOnboard = document.getElementById('close-modal-onboarding');
+  if (btnCloseOnboard) {
+    btnCloseOnboard.addEventListener('click', () => {
+      closeModal('modal-onboarding-overlay');
+      showToast('Modo de prueba activo. Recuerda exportar tu proyecto para no perder cambios.', 'info');
+    });
+  }
+
+  // Carga directa mediante input file nativo (onboard-file-input)
+  const inputOnboardFile = document.getElementById('onboard-file-input');
+  if (inputOnboardFile) {
+    inputOnboardFile.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        await loadProjectFromJSONFile(file);
+        try { inputOnboardFile.value = ''; } catch (_) {}
+      }
+    });
+  }
+
+  // Botón para cargar JSON pegado como texto (respaldo para iPhone y Android)
+  const btnLoadPastedJson = document.getElementById('btn-load-pasted-json');
+  if (btnLoadPastedJson) {
+    btnLoadPastedJson.addEventListener('click', () => {
+      const textarea = document.getElementById('paste-json-textarea');
+      if (textarea) {
+        loadProjectFromJSONText(textarea.value);
+      }
+    });
+  }
+
+  // Soporte de arrastrar y soltar (Drag and Drop) de archivos .json en el modal
+  const onboardModal = document.getElementById('modal-onboarding-overlay');
+  if (onboardModal) {
+    const modalBox = onboardModal.querySelector('.modal');
+    onboardModal.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (modalBox) modalBox.style.borderColor = 'var(--accent)';
+    });
+    onboardModal.addEventListener('dragleave', () => {
+      if (modalBox) modalBox.style.borderColor = 'var(--border)';
+    });
+    onboardModal.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      if (modalBox) modalBox.style.borderColor = 'var(--border)';
+      const files = e.dataTransfer?.files;
+      if (files && files[0] && files[0].name.endsWith('.json')) {
+        await loadProjectFromJSONFile(files[0]);
+      }
+    });
+  }
+
+  // Carga alternativa directa desde el topbar
+  const inputLoadJsonDirect = document.getElementById('input-load-json-direct');
+  if (inputLoadJsonDirect) {
+    inputLoadJsonDirect.addEventListener('change', async () => {
+      if (inputLoadJsonDirect.files && inputLoadJsonDirect.files[0]) {
+        await loadProjectFromJSONFile(inputLoadJsonDirect.files[0]);
+      }
+    });
+  }
+
   // Botón abrir carpeta (topbar)
   document.getElementById('btn-open-folder').addEventListener('click', () => openOrCreateProject('open'));
 
@@ -1202,10 +1811,32 @@ function initEventListeners() {
   document.getElementById('citation-source-select').addEventListener('change', updateCitationPreview);
   document.getElementById('citation-page').addEventListener('input', updateCitationPreview);
 
+  // Control de efectos de sonido
+  const btnSound = document.getElementById('btn-sound-toggle');
+  if (btnSound) btnSound.addEventListener('click', () => SoundFx.toggle());
+
+  // Toggle mapa de procedencia del texto
+  const btnToggleColor = document.getElementById('btn-toggle-color-map');
+  if (btnToggleColor) {
+    btnToggleColor.addEventListener('click', () => {
+      const editorWrapper = document.getElementById('quill-editor');
+      if (!editorWrapper) return;
+      const isHidden = editorWrapper.classList.toggle('hide-provenance');
+      btnToggleColor.textContent = isHidden ? 'Mostrar' : 'Ocultar';
+      btnToggleColor.title = isHidden ? 'Mostrar colores de procedencia' : 'Ocultar colores de procedencia';
+    });
+  }
+
+  // Modal huella biométrica calibrada
+  const btnCloseBio = document.getElementById('close-modal-bio');
+  if (btnCloseBio) btnCloseBio.addEventListener('click', () => closeModal('modal-biometrics-overlay'));
+  const btnConfirmBio = document.getElementById('btn-confirm-bio');
+  if (btnConfirmBio) btnConfirmBio.addEventListener('click', () => closeModal('modal-biometrics-overlay'));
+
   // Cerrar modales con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      ['modal-source-overlay','modal-citation-overlay'].forEach(id => closeModal(id));
+      ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay'].forEach(id => closeModal(id));
     }
   });
 
@@ -1214,6 +1845,7 @@ function initEventListeners() {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       await saveProject();
+      SoundFx.play('autosave_peace');
     }
   });
 
