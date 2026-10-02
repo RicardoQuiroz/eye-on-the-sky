@@ -32,6 +32,7 @@
   - [📸 5.8. Inserción de Capturas de Evidencia (PDFs)](#-58-inserción-de-capturas-de-evidencia-pdfs)
   - [💾 5.9. Autoguardado e Integridad Criptográfica Local](#-59-autoguardado-e-integridad-criptográfica-local)
   - [📦 5.10. Exportaciones para la Entrega](#-510-exportaciones-para-la-entrega)
+  - [📱 5.11. Modo Móvil y Menú Hamburguesa Autoexplicativo](#-511-modo-móvil-y-menú-hamburguesa-autoexplicativo)
 - [👨‍🏫 6. Manual del Docente (Dashboard de Auditoría)](#-6-manual-del-docente-dashboard-de-auditoría)
   - [📥 6.1. Carga Masiva de Trabajos (.JSON)](#-61-carga-masiva-de-trabajos-json)
   - [📊 6.2. Vista General y Métricas del Curso](#-62-vista-general-y-métricas-del-curso)
@@ -172,17 +173,19 @@ La interfaz del estudiante se encuentra en [`index.html`](file:///d:/Git/app-eye
 
 ### 📁 5.1. Abrir o Crear Carpeta / Archivo de Trabajo
 
-Al ingresar, una ventana de bienvenida ofrece opciones flexibles adaptadas a computadoras y teléfonos móviles:
-- 🆕 **Crear nuevo proyecto:** Permite seleccionar una carpeta local vacía (en navegadores de escritorio). El editor crea automáticamente la subcarpeta `capturas/` y el archivo `documento.json`.
-- 📂 **Abrir carpeta existente:** Abre la carpeta de un trabajo previo restaurando automáticamente cualquier archivo `.json` de Eye on the Sky encontrado en ella.
-- 📄 **Abrir archivo .json individual:** 
-  - **Compatibilidad 100% móvil y multiplataforma:** Diseñado con un selector nativo superpuesto compatible con **iPhone (iOS Safari)**, **Android (Chrome Mobile)** y **Windows/Mac/Linux**.
-  - Permite cargar el archivo desde la app *Archivos* de iOS, el explorador de descargas de Android, Google Drive o WhatsApp.
+Al ingresar, una ventana de bienvenida ofrece opciones flexibles adaptadas tanto a computadoras como a teléfonos móviles:
+- ✨ **Crear nuevo documento:** 
+  - **En iPhone y teléfonos móviles (iOS Safari / Chrome iOS / Android):** Al presionar el botón azul, la aplicación **inicia el documento de inmediato** sin exigir carpetas físicas ni mostrar errores de compatibilidad. El trabajo se autoguarda de forma continua en la memoria segura del navegador (`localStorage`), permitiendo descargar el archivo `.json` cuando se desee desde el menú *Exportar*.
+  - **En computadoras de escritorio (Chrome / Edge en Windows/Mac/Linux):** Permite vincular una carpeta local del disco duro donde la app autoguarda directamente el archivo `documento.json` y la subcarpeta `capturas/`.
+- 📂 **Abrir carpeta existente (Solo computadoras):** Permite seleccionar una carpeta previamente vinculada en PC para continuar el proyecto con guardado directo en disco. En dispositivos móviles esta opción se oculta automáticamente para simplificar la interfaz.
+- 📄 **Abrir archivo .json existente:** 
+  - **Compatibilidad 100% móvil y multiplataforma:** Diseñado con un selector nativo superpuesto compatible con **iPhone (iOS Safari y Chrome)**, **Android (Chrome Mobile)** y **Windows/Mac/Linux**.
+  - Permite cargar el archivo desde la app *Archivos* de iOS, iCloud Drive, Google Drive o el explorador de descargas de Android.
   - Al seleccionar el archivo, el proyecto se restaura al instante y se guarda automáticamente en `localStorage` para proteger la sesión si el teléfono suspende o recarga la pestaña por falta de memoria.
 - 📋 **Opción de Rescate (Pegar código JSON):** Si el estudiante tiene dificultades navegando en el explorador de archivos de su teléfono, puede desplegar la sección *"¿Problemas al seleccionar en iPhone o Android?"*, pegar el texto del archivo `.json` directamente y cargarlo en un solo toque.
 
 > [!IMPORTANT]
-> **Permiso de acceso a archivos (en computadoras):** Cuando tu navegador (Chrome o Edge) te pregunte si deseas otorgar permisos de lectura y escritura a la carpeta, haz clic en **"Permitir"**. En dispositivos móviles (iPhone y Android), el trabajo se autoguarda de forma continua y segura en el almacenamiento local del navegador (`localStorage`).
+> **Permiso de acceso a archivos vs Modo Móvil:** La tecnología de selección de carpetas en disco (*File System Access API*) es exclusiva de navegadores de escritorio (Chrome y Edge en PC). En sistemas operativos móviles como iOS (iPhone/iPad), Apple restringe todos los navegadores al motor WebKit que no soporta carpetas directas. Eye on the Sky resuelve esto de forma **100% transparente**: en iPhone y Android el documento se crea de inmediato y se autoguarda cada 15 segundos en `localStorage` con soporte de exportación a archivo `.json` en cualquier momento.
 
 ---
 
@@ -231,11 +234,23 @@ Para asegurar que el documento siempre está siendo redactado por el mismo autor
 
 ---
 
-### 📋 5.5. Gestión del Pegado Inicial Masivo
+### 📋 5.5. Gestión del Pegado Inicial Masivo (Cero Penalización en Estadísticas)
 
-Sabemos que muchos estudiantes inician un trabajo a partir de notas previas o esquemas construidos con anterioridad:
-- 🎁 **Pegado Inicial Exento:** Si el editor está en blanco y se pega un borrador inicial de notas, la aplicación **no lo penaliza**. Se notifica con un toast verde que el texto fue aceptado como punto de partida sin afectar negativamente la calificación de salud manual.
-- ⚠️ **Pegados posteriores:** Cualquier pegado efectuado durante el desarrollo del texto será registrado con su volumen de caracteres y fecha para control docente.
+Sabemos que en la investigación académica los estudiantes inician frecuentemente un trabajo a partir de notas de campo, apuntes previos, esquemas preliminares o directrices de cátedra:
+
+- 🎁 **Regla del Primer Pegado Masivo (100% Exento):**
+  - El **primer pegado masivo** que el estudiante realiza en su proyecto queda **completamente exento** de penalizaciones estadísticas, sin importar si antes ya escribió el título, su nombre o un encabezado de sección.
+  - **Impacto Cero en Métricas:**
+    - 🟢 **0 caracteres penalizados:** No se suma al contador de `Caracteres pegados` (`chars_pasted = 0`).
+    - 🟢 **100% de Escritura Manual:** El puntaje de salud del manuscrito permanece en 100% (no colapsa ni muestra color rojo).
+    - 🟢 **0 eventos de pegado punibles:** El contador de pegados no se incrementa (`Eventos de pegado = 0`).
+    - 🔇 **Sin alarmas sonoras:** No se reproduce el sonido de alerta de copia (`paste_alert`), notificando en pantalla con un mensaje azul de confirmación.
+    - 🔵 **Resaltado en azul suave:** En el editor se marca visualmente con fondo azul tenue (`🔵 Base exenta`), diferenciándolo nítidamente de posteriores pegados no autorizados (rojo).
+    - 📱 **Soporte universal:** Funciona tanto en computadoras de escritorio (Ctrl+V / Cmd+V) como en menús contextuales de dispositivos móviles (Android / iOS) e inserciones de texto por arrastre.
+- 👨‍🏫 **Tratamiento en el Dashboard Docente:**
+  - En la bitácora de sesiones, el evento se identifica con la etiqueta informativa **"Base exenta"** y el contador de pegados se muestra en `0`.
+  - **Sin falsas alertas de salto atípico:** El algoritmo de auditoría descuenta automáticamente las palabras del pegado inicial al calcular el ritmo de redacción por minuto, evitando que se dispare erróneamente la advertencia de *"Salto atípico en sesión X"*.
+- ⚠️ **Pegados posteriores (Monitoreados y Penalizados):** Cualquier segundo o subsecuente pegado masivo durante el proceso de redacción sí se considerará una inserción externa no justificada, siendo registrado con su volumen en caracteres, emitirá la alarma sonora correspondiente y reducirá el porcentaje de redacción manual del manuscrito.
 
 ---
 
@@ -289,6 +304,28 @@ Desde el menú **Exportar**:
 - 📝 **Exportar a Word (.docx):** Descarga el manuscrito listo para abrir en Microsoft Word.
 - 🗃️ **Bibliografía para Zotero (.ris):** Descarga tus fuentes en formato estándar RIS para importarlas a tu biblioteca de Zotero con un solo clic.
 - 💾 **Descargar copia JSON:** Genera un duplicado de respaldo de tu archivo `documento.json`.
+
+---
+
+### 📱 5.11. Modo Móvil y Menú Hamburguesa Autoexplicativo
+
+Para garantizar la mejor experiencia tanto en computadoras de escritorio como en teléfonos móviles inteligentes (iPhone y Android), el editor implementa una interfaz responsiva adaptable:
+
+- 💻 **En pantallas grandes (Desktop / Laptop $\ge$ 769px):**
+  - Mantiene intacto el diseño original con todos los accesos directos visibles en la barra superior (paneles de fuentes, telemetría, cambio de tema, audio, menú de exportación y vinculación de carpeta).
+  - El título de la barra superior se mantiene limpio y enfocado exclusivamente en el logo y el título editable del documento del estudiante.
+
+- 📱 **En teléfonos móviles y pantallas estrechas ($\le$ 768px):**
+  - **Barra superior despejada:** Oculta los botones de solo icono que resultaban crípticos o difíciles de interpretar en pantallas de celular. Muestra únicamente el isotipo, el campo del título del documento, el punto de estado de guardado y un **botón de Menú Hamburguesa** (☰).
+  - **Drawer Lateral Desplegable con texto explicativo:** Al pulsar el botón hamburguesa, se despliega un panel lateral suave con todas las funciones organizadas en categorías claras y acompañadas de nombres, iconos descriptivos y leyendas en español:
+    - 📊 **Estado de Guardado y Avance:** Muestra el número de palabras escritas y si el archivo está guardado localmente en tiempo real.
+    - 👁️ **Vistas y Paneles:** Botones para abrir el *Panel de Fuentes científicas* y el *Panel de Actividad y Salud*, con indicadores de estado ("Abierto" / "Oculto").
+    - ⚙️ **Preferencias:** Controles para alternar el *Tema visual* (Modo Claro / Modo Oscuro) y los *Efectos de sonido* de gamificación (Activado / Silenciado).
+    - 💾 **Archivo y Guardado:** Opciones para *Descargar copia (.json)* y *Abrir archivo .json existente* desde el explorador del dispositivo.
+    - 📄 **Exportar Manuscrito:** Enlaces para generar *PDF*, descargar en *Word (.docx)* o exportar para *Zotero (.ris)*.
+    - 👨‍🏫 **Docencia:** Acceso directo para saltar al *Panel Docente* (`dashboard.html`).
+  - **Paneles flotantes tipo overlay:** Los paneles de fuentes y telemetría se abren como tarjetas flotantes superpuestas para no comprimir ni desconfigurar el ancho de la hoja de redacción del documento.
+  - **Barra de formato con scroll táctil:** La barra de herramientas de negrita, cursiva, listas y encabezados se desplaza horizontalmente con suavidad táctil sin quebrar en múltiples filas.
 
 ---
 
@@ -351,11 +388,11 @@ El sistema califica automáticamente el nivel de riesgo de cada entrega:
 
 | Nivel | Icono | Tipo de Alerta | Causa / Diagnóstico Docente |
 | :---: | :---: | :--- | :--- |
-| **Peligro** | 🚨 | **Documento realizado en 1 sola sesión** | El documento tiene cientos o miles de palabras pero solo registra 1 sesión de trabajo (típico volcado de IA o compra de tesis). |
-| **Peligro** | 🚨 | **Baja escritura manual (< 40%)** | Más del 60% del documento fue producto de operaciones de pegado masivo. |
+| **Peligro** | 🚨 | **Documento realizado en 1 sola sesión** | El documento tiene cientos o miles de palabras manuales pero solo registra 1 sesión de trabajo (descontando el material base inicial exento). |
+| **Peligro** | 🚨 | **Baja escritura manual (< 40%)** | Más del 60% del documento fue producto de operaciones de pegado masivo no autorizadas. |
 | **Peligro** | 🚨 | **Cero fuentes con captura** | Ninguna de las fuentes bibliográficas citadas incluye evidencia visual de lectura. |
 | **Peligro** | 🚨 | **Discrepancia biométrica crítica** | El patrón de tecleo no coincide con la huella registrada del estudiante (suplantación de autoría). |
-| **Advertencia** | ⚠️ | **Salto atípico en sesión X** | Aumento brusco de texto (+400 palabras a un ritmo sobrehumano > 65 palabras/min). |
+| **Advertencia** | ⚠️ | **Salto atípico en sesión X** | Aumento brusco de texto (+400 palabras netas a un ritmo sobrehumano > 65 palabras/min, descontando el pegado inicial exento). |
 | **Advertencia** | ⚠️ | **Pocos días activos para el volumen** | Documentos extensos confeccionados en 1 solo día de trabajo. |
 | **Advertencia** | ⚠️ | **Modificación manual del JSON** | La firma criptográfica SHA-256 no coincide; el alumno intentó alterar las telemetrías con un editor de texto externo. |
 | **Correcto** | 🟢 | **Sin alertas** | Muestra consistencia incremental, sesiones distribuidas, biometría estable y fuentes respaldadas. |
