@@ -110,12 +110,12 @@ const App = {
 const SoundFx = {
   enabled: localStorage.getItem('eots-sound-enabled') !== 'false',
   files: {
-    session_start:   'Sounds/session_start.mp3',
-    milestone_words: 'Sounds/milestone_words.mp3',
-    source_captured: 'Sounds/citation_success.mp3',
-    autosave_peace:  'Sounds/calibration_complete.mp3',
-    paste_alert:     'Sounds/paste_warning.mp3',
-    export_success:  'Sounds/calibration_complete.mp3',
+    session_start:   'sounds/session_start.mp3',
+    milestone_words: 'sounds/milestone_words.mp3',
+    source_captured: 'sounds/source_captured.mp3',
+    autosave_peace:  'sounds/autosave_peace.mp3',
+    paste_alert:     'sounds/paste_alert.mp3',
+    export_success:  'sounds/export_success.mp3',
   },
   audioCache: {},
 
@@ -170,6 +170,7 @@ const SoundFx = {
     if (btn) btn.title = this.enabled ? 'Efectos de sonido (Activados)' : 'Efectos de sonido (Silenciados)';
     if (iconOn) iconOn.classList.toggle('hidden', !this.enabled);
     if (iconOff) iconOff.classList.toggle('hidden', this.enabled);
+    if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
   }
 };
 
@@ -384,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   initSessionTimer();
   restoreTheme();
+  adaptUIForPlatform();
   checkAndRestoreActiveProject();
 });
 
@@ -421,9 +423,31 @@ function initQuill() {
     const currentWC  = countWords(text);
     const wordDiff   = Math.max(0, currentWC - App.session.previousWordCount);
 
-    // Solo sumar al conteo manual si NO fue un pegado
-    if (!App.session.isPasting && wordDiff > 0) {
-      App.session.words_typed += wordDiff;
+    if (wordDiff > 0) {
+      if (App.session.isPasting) {
+        // Ignorar palabras insertadas durante un evento de pegado capturado
+      } else if (wordDiff >= 10) {
+        // Inserción masiva súbita no capturada por evento DOM paste (ej: móviles Android/iOS o drag & drop)
+        const isInitial = isProjectInitialPaste();
+        const approxChars = wordDiff * 5;
+        const pasteRecord = {
+          timestamp:    new Date().toISOString(),
+          chars_pasted: approxChars,
+          approx_words: wordDiff,
+          is_initial:   isInitial,
+        };
+        App.session.paste_events.push(pasteRecord);
+        if (isInitial) {
+          App.project.has_initial_paste = true;
+          showToast('📋 Pegado inicial detectado y registrado como material base exento (0 penalización).', 'info');
+        } else {
+          App.session.chars_pasted += approxChars;
+          SoundFx.play('paste_alert');
+        }
+      } else {
+        // Escritura manual genuina (< 10 palabras en un solo micro-cambio)
+        App.session.words_typed += wordDiff;
+      }
     }
 
     // Hitos de palabras para gamificación (100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000)
@@ -431,7 +455,7 @@ function initQuill() {
     for (const m of milestones) {
       if (currentWC >= m && !App.session.passedMilestones.has(m)) {
         App.session.passedMilestones.add(m);
-        if (!App.session.isPasting) {
+        if (!App.session.isPasting && wordDiff < 10) {
           SoundFx.play('milestone_words');
           showToast(`🎯 ¡Hito alcanzado: ${m} palabras escritas!`, 'success');
         }
@@ -459,13 +483,41 @@ function initQuill() {
    TELEMETRÍA
    ================================================================ */
 
+function isProjectInitialPaste() {
+  // 1. Si el proyecto ya tiene registrado un pegado inicial
+  if (App.project.has_initial_paste) return false;
+
+  // 2. Si alguna sesión previa en el historial ya contiene un pegado inicial
+  const sessions = App.project.telemetry?.sessions || [];
+  const hadInitial = sessions.some(s => (s.paste_events || []).some(p => p.is_initial));
+  if (hadInitial) {
+    App.project.has_initial_paste = true;
+    return false;
+  }
+
+  // 3. Si en la sesión activa ya se registró un pegado inicial
+  if ((App.session.paste_events || []).some(p => p.is_initial)) {
+    return false;
+  }
+
+  // 4. Si el proyecto ya tiene más de 2 sesiones consolidadas y >300 palabras escritas,
+  // ya no estamos en la fase inicial de configuración del documento
+  const totalPrevTyped = sessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
+  if (sessions.length > 2 && totalPrevTyped > 300) {
+    return false;
+  }
+
+  // Es el primer pegado masivo del documento (completamente exento)
+  return true;
+}
+
 function handlePasteEvent(e) {
   const clipText = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
   const chars = clipText.length;
   if (chars < 10) return; // ignora pegados triviales
 
-  // ¿El documento estaba vacío antes del pegado?
-  const isInitialPaste = App.session.previousWordCount === 0;
+  // Determinar si es el primer pegado masivo del documento
+  const isInitialPaste = isProjectInitialPaste();
   const range = App.quill ? App.quill.getSelection(true) : null;
   const pasteIndex = range ? range.index : 0;
 
@@ -478,23 +530,27 @@ function handlePasteEvent(e) {
       const bgColor = isInitialPaste ? 'rgba(74, 108, 247, 0.16)' : 'rgba(229, 57, 53, 0.18)';
       App.quill.formatText(pasteIndex, chars, 'background', bgColor);
     }
-  }, 80);
+  }, 100);
+
+  const approxWords = Math.round(chars / 5);
 
   const pasteRecord = {
     timestamp:    new Date().toISOString(),
     chars_pasted: chars,
-    approx_words: Math.round(chars / 5),
+    approx_words: approxWords,
     is_initial:   isInitialPaste,
   };
 
   App.session.paste_events.push(pasteRecord);
 
-  if (!isInitialPaste) {
+  if (isInitialPaste) {
+    App.project.has_initial_paste = true;
+    // CRÍTICO: No sumar a App.session.chars_pasted para no distorsionar estadísticas
+    showToast('📋 Pegado inicial de material base registrado (exento de penalización en estadísticas).', 'info');
+  } else {
     // Solo penalizar pastes que no son el inicial
     App.session.chars_pasted += chars;
     SoundFx.play('paste_alert');
-  } else {
-    showToast('Pegado inicial registrado sin penalización.', 'success');
   }
 
   updateTelemetryUI();
@@ -581,13 +637,51 @@ function updateTelemetryUI() {
 }
 
 /* ================================================================
-   GESTIÓN DEL PROYECTO (File System Access API)
+   GESTIÓN DEL PROYECTO (File System Access API y Almacenamiento Local)
    ================================================================ */
 
+function adaptUIForPlatform() {
+  const hasFSA = 'showDirectoryPicker' in window;
+  const onboardOpen = document.getElementById('onboard-open');
+  const onboardNewText = document.getElementById('onboard-new-text');
+  const folderLabel = document.getElementById('open-folder-label');
+  const mobileNotice = document.getElementById('onboard-mobile-notice');
+
+  if (!hasFSA) {
+    if (onboardNewText) onboardNewText.textContent = 'Crear nuevo documento';
+    if (onboardOpen) onboardOpen.style.display = 'none';
+    if (folderLabel) folderLabel.textContent = 'Guardado local';
+    if (mobileNotice) mobileNotice.style.display = 'block';
+  } else {
+    if (onboardNewText) onboardNewText.textContent = 'Crear nuevo documento (en carpeta)';
+    if (onboardOpen) onboardOpen.style.display = 'flex';
+  }
+
+  // En pantallas móviles / tablets estrechas, colapsar paneles laterales al inicio para maximizar el área de escritura
+  if (window.innerWidth <= 768) {
+    App.ui.sourcesPanelOpen = false;
+    App.ui.telePanelOpen = false;
+    const sbSources = document.getElementById('sidebar-sources');
+    const sbTele = document.getElementById('sidebar-telemetry');
+    if (sbSources) sbSources.classList.add('collapsed');
+    if (sbTele) sbTele.classList.add('collapsed');
+  }
+}
+
 async function openOrCreateProject(mode) {
-  if (!('showDirectoryPicker' in window)) {
-    showToast('Tu navegador no soporta la API de acceso a archivos. Usa Chrome o Edge.', 'error');
-    return;
+  const hasFSA = 'showDirectoryPicker' in window;
+
+  if (!hasFSA) {
+    if (mode === 'new') {
+      // En iPhone, Android, Safari, etc. crear directamente sin bloquear con errores
+      await createNewProjectDirectly();
+      return;
+    } else {
+      // Si quería abrir pero no soporta carpetas, disparar selector de .json
+      showToast('En dispositivos móviles, selecciona tu archivo .json directamente.', 'info');
+      openJsonFileDialog();
+      return;
+    }
   }
 
   try {
@@ -611,15 +705,49 @@ async function openOrCreateProject(mode) {
     document.getElementById('sb-project-name').textContent = dirHandle.name;
     document.getElementById('open-folder-label').textContent = 'Cambiar carpeta';
 
-    // Iniciar autoguardado (cada 30 segundos)
+    // Iniciar autoguardado (cada 15 segundos)
     startAutosave();
 
   } catch (err) {
     if (err.name !== 'AbortError') {
       console.error('Error al abrir carpeta:', err);
-      showToast('No se pudo abrir la carpeta. ' + err.message, 'error');
+      if (mode === 'new') {
+        await createNewProjectDirectly();
+      } else {
+        showToast('No se pudo abrir la carpeta. ' + err.message, 'error');
+      }
     }
   }
+}
+
+async function createNewProjectDirectly() {
+  App.dirHandle = null;
+  App.capturasHandle = null;
+
+  // Inicializar metadatos del proyecto
+  App.project.metadata.created_at = new Date().toISOString();
+  App.project.metadata.title = 'Sin título';
+  const titleInput = document.getElementById('doc-title-input');
+  if (titleInput) titleInput.value = '';
+
+  if (App.quill) {
+    App.quill.setText('');
+  }
+
+  startProjectSession();
+  await saveProject();
+
+  closeModal('modal-onboarding-overlay');
+  App.ui.projectLoaded = true;
+
+  const sbName = document.getElementById('sb-project-name');
+  if (sbName) sbName.textContent = 'Documento nuevo (Local)';
+  const folderLabel = document.getElementById('open-folder-label');
+  if (folderLabel) folderLabel.textContent = 'Almacenamiento local';
+
+  startAutosave();
+  SoundFx.play('session_start');
+  showToast('✓ Documento listo. Tu trabajo se guarda continuamente en este dispositivo.', 'success');
 }
 
 function startProjectSession() {
@@ -819,6 +947,13 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
     App.project.sources = [];
   }
 
+  // Detectar si el proyecto importado ya tiene pegado inicial
+  if (App.project.has_initial_paste === undefined) {
+    App.project.has_initial_paste = (App.project.telemetry?.sessions || []).some(s => 
+      (s.paste_events || []).some(p => p.is_initial)
+    );
+  }
+
   // Restaurar contenido en Quill de forma segura
   if (App.quill) {
     try {
@@ -914,9 +1049,9 @@ async function openJsonFileDialog() {
 function startAutosave() {
   if (App.session.autosave_ref) clearInterval(App.session.autosave_ref);
   App.session.autosave_ref = setInterval(async () => {
-    if (!App.ui.isDirty || !App.dirHandle) return;
+    if (!App.ui.isDirty) return;
     await saveProject();
-  }, 30_000); // cada 30 segundos
+  }, 15_000); // cada 15 segundos continuo (en disco o localStorage)
 }
 
 async function saveProject() {
@@ -950,6 +1085,12 @@ async function saveProject() {
       App.session.session_number = App.project.telemetry.sessions.length + 1;
     }
 
+    // Asegurar que chars_pasted de la sesión solo contabilice eventos NO iniciales
+    const nonInitialSessionChars = (App.session.paste_events || [])
+      .filter(ev => !ev.is_initial)
+      .reduce((sum, ev) => sum + (ev.chars_pasted || 0), 0);
+    App.session.chars_pasted = nonInitialSessionChars;
+
     // Registro detallado de la sesión activa
     const currentSessionRecord = {
       session_id:         App.session.id,
@@ -962,7 +1103,7 @@ async function saveProject() {
       final_word_count:   currentWC,
       words_net_change:   currentWC - (App.session.initial_word_count || 0),
       words_typed:        App.session.words_typed,
-      chars_pasted:       App.session.chars_pasted,
+      chars_pasted:       nonInitialSessionChars,
       paste_events:       [...App.session.paste_events],
       keystroke_count:    App.session.keystroke_count,
       biometrics: {
@@ -986,7 +1127,14 @@ async function saveProject() {
     const allSessions = App.project.telemetry.sessions;
     const daysSet = new Set(allSessions.map(s => s.date).filter(Boolean));
     const totalWordsTyped = allSessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
-    const totalCharsPasted = allSessions.reduce((sum, s) => sum + (s.chars_pasted || 0), 0);
+
+    // Sumar ÚNICAMENTE caracteres de eventos no iniciales
+    const totalCharsPasted = allSessions.reduce((sum, s) => {
+      const sChars = (s.paste_events || [])
+        .filter(ev => !ev.is_initial)
+        .reduce((pSum, ev) => pSum + (ev.chars_pasted || 0), 0);
+      return sum + sChars;
+    }, 0);
 
     let allPenalizedPasteWords = 0;
     allSessions.forEach(s => {
@@ -1583,27 +1731,31 @@ function countWords(text) {
 }
 
 function updateWordCount(count) {
-  document.getElementById('sb-word-count').textContent = `${count} palabras`;
+  const sbWc = document.getElementById('sb-word-count');
+  if (sbWc) sbWc.textContent = `${count} palabras`;
+  const mobWc = document.getElementById('mob-word-count-badge');
+  if (mobWc) mobWc.textContent = `${count} palabras`;
 }
 
 function updateSaveStatus(state, isoDate) {
   const el   = document.getElementById('save-status');
   const text = document.getElementById('save-status-text');
-  el.classList.remove('saving', 'unsaved', 'error');
+  if (el) el.classList.remove('saving', 'unsaved', 'error');
 
   if (state === 'saving') {
-    el.classList.add('saving');
-    text.textContent = 'Guardando…';
+    if (el) el.classList.add('saving');
+    if (text) text.textContent = 'Guardando…';
   } else if (state === 'saved') {
     const t = isoDate ? new Date(isoDate).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '';
-    text.textContent = `Guardado ${t}`;
+    if (text) text.textContent = `Guardado ${t}`;
   } else if (state === 'unsaved') {
-    el.classList.add('unsaved');
-    text.textContent = 'Sin guardar';
+    if (el) el.classList.add('unsaved');
+    if (text) text.textContent = 'Sin guardar';
   } else if (state === 'error') {
-    el.classList.add('error');
-    text.textContent = 'Error al guardar';
+    if (el) el.classList.add('error');
+    if (text) text.textContent = 'Error al guardar';
   }
+  if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
 }
 
 function generateId() {
@@ -1645,8 +1797,11 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   App.ui.currentTheme = theme;
   localStorage.setItem('eots-theme', theme);
-  document.getElementById('theme-icon-light').classList.toggle('hidden', theme === 'dark');
-  document.getElementById('theme-icon-dark').classList.toggle('hidden', theme === 'light');
+  const iconLight = document.getElementById('theme-icon-light');
+  const iconDark = document.getElementById('theme-icon-dark');
+  if (iconLight) iconLight.classList.toggle('hidden', theme === 'dark');
+  if (iconDark) iconDark.classList.toggle('hidden', theme === 'light');
+  if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
 }
 
 /* ================================================================
@@ -1662,9 +1817,11 @@ function initEventListeners() {
   // Cerrar modal de onboarding con botón ✕ (continuar sin carpeta)
   const btnCloseOnboard = document.getElementById('close-modal-onboarding');
   if (btnCloseOnboard) {
-    btnCloseOnboard.addEventListener('click', () => {
+    btnCloseOnboard.addEventListener('click', async () => {
       closeModal('modal-onboarding-overlay');
-      showToast('Modo de prueba activo. Recuerda exportar tu proyecto para no perder cambios.', 'info');
+      if (!App.ui.projectLoaded) {
+        await createNewProjectDirectly();
+      }
     });
   }
 
@@ -1723,7 +1880,13 @@ function initEventListeners() {
   }
 
   // Botón abrir carpeta (topbar)
-  document.getElementById('btn-open-folder').addEventListener('click', () => openOrCreateProject('open'));
+  document.getElementById('btn-open-folder').addEventListener('click', () => {
+    if (!('showDirectoryPicker' in window)) {
+      openJsonFileDialog();
+    } else {
+      openOrCreateProject('open');
+    }
+  });
 
   // Toggle sidebars
   document.getElementById('btn-toggle-sources').addEventListener('click', () => {
@@ -1837,6 +2000,7 @@ function initEventListeners() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay'].forEach(id => closeModal(id));
+      closeMobileMenu();
     }
   });
 
@@ -1864,6 +2028,197 @@ function initEventListeners() {
       e.returnValue = '';
     }
   });
+
+  // Inicializar menú hamburguesa y opciones móviles
+  initMobileMenu();
+}
+
+/* ================================================================
+   MENÚ HAMBURGUESA Y DRAWER MÓVIL
+   ================================================================ */
+
+function openMobileMenu() {
+  updateMobileMenuUI();
+  const overlay = document.getElementById('mobile-menu-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function closeMobileMenu() {
+  const overlay = document.getElementById('mobile-menu-overlay');
+  if (overlay) overlay.classList.remove('active');
+}
+
+function updateMobileMenuUI() {
+  // Estado de guardado
+  const statusDot = document.getElementById('mob-status-dot');
+  const statusText = document.getElementById('mob-save-status-text');
+  const mainStatus = document.getElementById('save-status');
+  const mainText = document.getElementById('save-status-text');
+  if (statusText && mainText) {
+    statusText.textContent = mainText.textContent || 'Guardado';
+  }
+  if (statusDot && mainStatus) {
+    if (mainStatus.classList.contains('saving')) {
+      statusDot.style.background = 'var(--warning)';
+    } else if (mainStatus.classList.contains('unsaved') || mainStatus.classList.contains('error')) {
+      statusDot.style.background = 'var(--danger)';
+    } else {
+      statusDot.style.background = 'var(--success)';
+    }
+  }
+
+  // Conteo de palabras
+  const mobWc = document.getElementById('mob-word-count-badge');
+  const sbWc = document.getElementById('sb-word-count');
+  if (mobWc && sbWc) {
+    mobWc.textContent = sbWc.textContent;
+  }
+
+  // Paneles de fuentes y telemetría
+  const badgeSources = document.getElementById('mob-badge-sources');
+  const badgeTele = document.getElementById('mob-badge-tele');
+  if (badgeSources) {
+    badgeSources.textContent = App.ui.sourcesPanelOpen ? 'Abierto' : 'Oculto';
+    badgeSources.style.color = App.ui.sourcesPanelOpen ? 'var(--accent)' : 'var(--text-secondary)';
+  }
+  if (badgeTele) {
+    badgeTele.textContent = App.ui.telePanelOpen ? 'Abierto' : 'Oculto';
+    badgeTele.style.color = App.ui.telePanelOpen ? 'var(--accent)' : 'var(--text-secondary)';
+  }
+
+  // Tema visual
+  const isDark = App.ui.currentTheme === 'dark';
+  const themeDesc = document.getElementById('mob-theme-desc');
+  const themeBadge = document.getElementById('mob-theme-badge');
+  if (themeDesc) themeDesc.textContent = isDark ? 'Modo Oscuro activo' : 'Modo Claro activo';
+  if (themeBadge) themeBadge.textContent = isDark ? 'Claro ☀' : 'Oscuro 🌙';
+
+  // Sonido
+  const soundDesc = document.getElementById('mob-sound-desc');
+  const soundBadge = document.getElementById('mob-sound-badge');
+  if (soundDesc) soundDesc.textContent = SoundFx.enabled ? 'Sonidos activados (gamificación)' : 'Sonidos silenciados';
+  if (soundBadge) {
+    soundBadge.textContent = SoundFx.enabled ? 'Activado' : 'Silenciado';
+    soundBadge.style.color = SoundFx.enabled ? 'var(--success)' : 'var(--text-muted)';
+  }
+
+  // Botón vincular carpeta
+  const btnFolder = document.getElementById('mob-btn-folder');
+  if (btnFolder) {
+    btnFolder.style.display = ('showDirectoryPicker' in window) ? 'flex' : 'none';
+  }
+}
+
+function initMobileMenu() {
+  const btnHamburger = document.getElementById('btn-hamburger-menu');
+  const btnClose = document.getElementById('close-mobile-menu');
+  const overlay = document.getElementById('mobile-menu-overlay');
+
+  if (btnHamburger) btnHamburger.addEventListener('click', openMobileMenu);
+  if (btnClose) btnClose.addEventListener('click', closeMobileMenu);
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeMobileMenu();
+    });
+  }
+
+  // Vistas y Paneles
+  const mobSources = document.getElementById('mob-btn-toggle-sources');
+  if (mobSources) {
+    mobSources.addEventListener('click', () => {
+      const sidebar = document.getElementById('sidebar-sources');
+      App.ui.sourcesPanelOpen = !App.ui.sourcesPanelOpen;
+      if (sidebar) sidebar.classList.toggle('collapsed', !App.ui.sourcesPanelOpen);
+      if (App.ui.sourcesPanelOpen && window.innerWidth <= 768) {
+        const tele = document.getElementById('sidebar-telemetry');
+        App.ui.telePanelOpen = false;
+        if (tele) tele.classList.add('collapsed');
+      }
+      updateMobileMenuUI();
+      closeMobileMenu();
+    });
+  }
+
+  const mobTele = document.getElementById('mob-btn-toggle-tele');
+  if (mobTele) {
+    mobTele.addEventListener('click', () => {
+      const sidebar = document.getElementById('sidebar-telemetry');
+      App.ui.telePanelOpen = !App.ui.telePanelOpen;
+      if (sidebar) sidebar.classList.toggle('collapsed', !App.ui.telePanelOpen);
+      if (App.ui.telePanelOpen && window.innerWidth <= 768) {
+        const sources = document.getElementById('sidebar-sources');
+        App.ui.sourcesPanelOpen = false;
+        if (sources) sources.classList.add('collapsed');
+      }
+      updateMobileMenuUI();
+      closeMobileMenu();
+    });
+  }
+
+  // Preferencias
+  const mobTheme = document.getElementById('mob-btn-theme');
+  if (mobTheme) {
+    mobTheme.addEventListener('click', () => {
+      applyTheme(App.ui.currentTheme === 'light' ? 'dark' : 'light');
+    });
+  }
+
+  const mobSound = document.getElementById('mob-btn-sound');
+  if (mobSound) {
+    mobSound.addEventListener('click', () => {
+      SoundFx.toggle();
+    });
+  }
+
+  // Archivo y Guardado
+  const mobSaveJson = document.getElementById('mob-btn-save-json');
+  if (mobSaveJson) {
+    mobSaveJson.addEventListener('click', async () => {
+      closeMobileMenu();
+      await exportJSON();
+    });
+  }
+
+  const mobOpenFile = document.getElementById('mob-btn-open-file');
+  if (mobOpenFile) {
+    mobOpenFile.addEventListener('click', () => {
+      closeMobileMenu();
+      openJsonFileDialog();
+    });
+  }
+
+  const mobFolder = document.getElementById('mob-btn-folder');
+  if (mobFolder) {
+    mobFolder.addEventListener('click', () => {
+      closeMobileMenu();
+      openOrCreateProject('open');
+    });
+  }
+
+  // Exportar manuscrito
+  const mobExportPdf = document.getElementById('mob-btn-export-pdf');
+  if (mobExportPdf) {
+    mobExportPdf.addEventListener('click', () => {
+      closeMobileMenu();
+      exportToPDF();
+    });
+  }
+
+  const mobExportDocx = document.getElementById('mob-btn-export-docx');
+  if (mobExportDocx) {
+    mobExportDocx.addEventListener('click', () => {
+      closeMobileMenu();
+      exportToDocx();
+    });
+  }
+
+  const mobExportRis = document.getElementById('mob-btn-export-ris');
+  if (mobExportRis) {
+    mobExportRis.addEventListener('click', () => {
+      closeMobileMenu();
+      exportToRIS();
+    });
+  }
 }
 
 function previewScreenshot(file) {

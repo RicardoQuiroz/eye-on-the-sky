@@ -56,6 +56,32 @@ function initEventListeners() {
     Dash.detailStudent = null;
   });
 
+  // Modal de Apps Script y correo masivo
+  const btnOpenEmailModal = document.getElementById('btn-open-email-modal');
+  if (btnOpenEmailModal) {
+    btnOpenEmailModal.addEventListener('click', openAppsScriptModal);
+  }
+  const btnCloseEmailModal = document.getElementById('close-modal-email');
+  if (btnCloseEmailModal) {
+    btnCloseEmailModal.addEventListener('click', closeAppsScriptModal);
+  }
+  const modalEmailOverlay = document.getElementById('modal-email-apps-script');
+  if (modalEmailOverlay) {
+    modalEmailOverlay.addEventListener('click', (e) => {
+      if (e.target === modalEmailOverlay) closeAppsScriptModal();
+    });
+  }
+  const btnCopyScript = document.getElementById('btn-copy-apps-script');
+  if (btnCopyScript) {
+    btnCopyScript.addEventListener('click', copyAppsScriptCode);
+  }
+
+  // Envío individual de correo desde el detalle del estudiante
+  const btnDetailSendEmail = document.getElementById('detail-send-email-btn');
+  if (btnDetailSendEmail) {
+    btnDetailSendEmail.addEventListener('click', sendIndividualStudentEmail);
+  }
+
   const btnSources = document.getElementById('detail-view-sources');
   if (btnSources) {
     btnSources.addEventListener('click', () => {
@@ -163,6 +189,43 @@ function computeMetrics(project) {
   const totalSessions = tele.total_sessions || sessions.length || 0;
   const daysActive = tele.total_days_active || new Set(sessions.map(s => s.date).filter(Boolean)).size || 0;
 
+  // Caracteres pegados y palabras iniciales exentas calculadas con rigor
+  let charsPastedClean = 0;
+  let penalizedPasteWordsClean = 0;
+  let initialPasteWords = 0;
+  let hasSessionPastes = false;
+
+  sessions.forEach(s => {
+    (s.paste_events || []).forEach(p => {
+      hasSessionPastes = true;
+      if (p.is_initial) {
+        initialPasteWords += (p.approx_words || Math.round((p.chars_pasted || 0) / 5));
+      } else {
+        charsPastedClean += (p.chars_pasted || 0);
+        penalizedPasteWordsClean += (p.approx_words || Math.round((p.chars_pasted || 0) / 5));
+      }
+    });
+  });
+
+  // Fallback si no hay paste_events detallados pero summary tiene total_chars_pasted
+  if (!hasSessionPastes && tele.total_chars_pasted !== undefined) {
+    charsPastedClean = tele.total_chars_pasted;
+  }
+
+  const wordsTypedClean = tele.total_words_typed || sessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
+  const totalActivity = wordsTypedClean + penalizedPasteWordsClean;
+  const manualRatioClean = totalActivity > 0
+    ? (wordsTypedClean / totalActivity)
+    : (tele.manual_ratio !== undefined ? tele.manual_ratio : 1);
+
+  const bio = project.biometrics || {};
+  const hasBioBaseline = !!(bio.baseline && (bio.baseline.sample_size || 0) >= 100);
+  const bioScore = (bio.session_metrics && bio.session_metrics.similarity_score !== undefined)
+    ? bio.session_metrics.similarity_score
+    : (hasBioBaseline ? 100 : null);
+  const bioDwell = bio.session_metrics?.mean_dwell_ms || bio.baseline?.mean_dwell_ms || null;
+  const bioFlight = bio.session_metrics?.mean_flight_ms || bio.baseline?.mean_flight_ms || null;
+
   return {
     student_name:          project.metadata?.student_name || extractNameFromFilename(project._filename),
     doc_title:             project.metadata?.title || 'Sin título',
@@ -170,26 +233,35 @@ function computeMetrics(project) {
     last_saved:            project.metadata?.last_saved,
     total_sessions:        totalSessions,
     total_days_active:     daysActive,
-    total_words_typed:     tele.total_words_typed    || 0,
-    total_chars_pasted:    tele.total_chars_pasted   || 0,
-    manual_ratio:          tele.manual_ratio !== undefined ? tele.manual_ratio : 0,
+    total_words_typed:     wordsTypedClean,
+    total_chars_pasted:    charsPastedClean,
+    manual_ratio:          manualRatioClean,
+    initial_paste_words:   initialPasteWords,
     sources_count:         sources.length,
     sources_with_screenshot: tele.sources_with_screenshot || sources.filter(s => s.screenshot_filename).length,
     sources_cited_in_text: tele.sources_cited_in_text || sources.filter(s => s.cited_in_text).length,
     word_count:            wordCount,
     integrity_ok:          project._integrity_ok,
     sessions:              sessions,
+    has_biometric_baseline: hasBioBaseline,
+    biometric_score:        bioScore,
+    biometric_dwell:        bioDwell,
+    biometric_flight:       bioFlight,
+    biometrics_raw:         bio,
   };
 }
 
 function computeAlerts(m) {
   const alerts = [];
 
+  // Palabras manuales reales descontando el material base inicial exento
+  const netManualManuscript = Math.max(0, m.word_count - (m.initial_paste_words || 0));
+
   // Alerta crítica: pocas sesiones para el volumen del trabajo
-  if (m.total_sessions <= 1 && m.word_count > 200) {
+  if (m.total_sessions <= 1 && netManualManuscript > 200) {
     alerts.push({ level: 'danger', message: 'Documento realizado en 1 sola sesión (sin proceso incremental)' });
-  } else if (m.total_sessions <= 2 && m.word_count > 600) {
-    alerts.push({ level: 'warning', message: `Solo 2 sesiones para un manuscrito de ${m.word_count} palabras` });
+  } else if (m.total_sessions <= 2 && netManualManuscript > 600) {
+    alerts.push({ level: 'warning', message: `Solo 2 sesiones para un manuscrito de ${netManualManuscript} palabras manuales` });
   }
 
   // Detección de salto anómalo entre sesiones
@@ -197,11 +269,19 @@ function computeAlerts(m) {
     m.sessions.forEach(s => {
       const net = (s.words_net_change !== undefined) ? s.words_net_change : ((s.final_word_count || 0) - (s.initial_word_count || 0));
       const min = Math.max(1, s.duration_minutes || 1);
+
+      // Descontar palabras del pegado inicial si ocurrieron en esta sesión
+      const sessionInitialWords = (s.paste_events || [])
+        .filter(p => p.is_initial)
+        .reduce((sum, p) => sum + (p.approx_words || Math.round((p.chars_pasted || 0) / 5)), 0);
+
+      const netEffective = Math.max(0, net - sessionInitialWords);
+
       // Salto brusco: más de 400 palabras netas a un ritmo mayor de 65 palabras/minuto
-      if (net > 400 && (net / min) > 65) {
+      if (netEffective > 400 && (netEffective / min) > 65) {
         alerts.push({
           level: 'warning',
-          message: `Salto atípico en sesión ${s.session_number || ''} (${s.date || ''}): +${net} palabras en ${min} min`
+          message: `Salto atípico en sesión ${s.session_number || ''} (${s.date || ''}): +${netEffective} palabras en ${min} min`
         });
       }
     });
@@ -212,6 +292,24 @@ function computeAlerts(m) {
     alerts.push({ level: 'danger', message: `Solo ${Math.round(m.manual_ratio * 100)}% texto escrito manualmente` });
   } else if (m.manual_ratio < 0.65) {
     alerts.push({ level: 'warning', message: `${Math.round(m.manual_ratio * 100)}% de escritura manual (bajo)` });
+  }
+
+  // Alerta de biometría de tecleo: discrepancia con huella del autor original
+  if (m.has_biometric_baseline && m.biometric_score !== null && m.biometric_score < 60) {
+    alerts.push({
+      level: 'danger',
+      message: `Anomalía biométrica crítica: ${m.biometric_score}% consistencia con la huella digital del autor (sospecha de suplantación o cambio de transcriptor)`
+    });
+  } else if (m.has_biometric_baseline && m.biometric_score !== null && m.biometric_score < 75) {
+    alerts.push({
+      level: 'warning',
+      message: `Divergencia en dinámica de tecleo: ${m.biometric_score}% de consistencia con el patrón biomecánico registrado`
+    });
+  } else if (!m.has_biometric_baseline && m.word_count > 300) {
+    alerts.push({
+      level: 'warning',
+      message: `Manuscrito de ${m.word_count} palabras sin huella biométrica de escritura calibrada`
+    });
   }
 
   // Sin fuentes con captura
@@ -385,7 +483,7 @@ function renderTable() {
   tbody.innerHTML = '';
 
   if (data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">No se encontraron resultados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 32px; color: var(--text-muted);">No se encontraron resultados.</td></tr>`;
     return;
   }
 
@@ -414,6 +512,9 @@ function renderTable() {
       <td>${m.sources_with_screenshot} / ${m.sources_count}</td>
       <td>${m.word_count.toLocaleString()}</td>
       <td>
+        ${renderBiometricBadge(m)}
+      </td>
+      <td>
         ${level === 'ok'
           ? '<span class="alert-badge alert-ok">✓ Sin alertas</span>'
           : `<span class="alert-badge alert-${level}" title="${student._alerts.map(a => a.message).join('\n')}">
@@ -430,6 +531,24 @@ function renderTable() {
 
     tbody.appendChild(tr);
   });
+}
+
+function renderBiometricBadge(m) {
+  if (!m.has_biometric_baseline) {
+    return `<span class="alert-badge" style="background:var(--border); color:var(--text-muted); font-size:0.75rem;" title="Aún no se ha completado la calibración (250 pulsaciones)">Sin huella</span>`;
+  }
+  const score = m.biometric_score ?? 100;
+  const dwell = m.biometric_dwell ? `${m.biometric_dwell}ms` : '—';
+  const flight = m.biometric_flight ? `${m.biometric_flight}ms` : '—';
+  const title = `Permanencia: ${dwell} | Pausa: ${flight} | Consistencia: ${score}%`;
+
+  if (score >= 75) {
+    return `<span class="alert-badge alert-ok" style="font-size:0.75rem;" title="${title}">✓ ${score}% (Autor)</span>`;
+  } else if (score >= 60) {
+    return `<span class="alert-badge alert-warning" style="font-size:0.75rem;" title="${title}">! ${score}% (Divergente)</span>`;
+  } else {
+    return `<span class="alert-badge alert-danger" style="font-size:0.75rem;" title="${title}">⚠ ${score}% (Cambio autor)</span>`;
+  }
 }
 
 /* ================================================================
@@ -453,6 +572,13 @@ function showStudentDetail(encodedFilename) {
     { label: 'Días de trabajo',     value: m.total_days_active },
     { label: 'Sesiones',            value: m.total_sessions },
     { label: 'Texto manual',        value: Math.round(m.manual_ratio * 100) + '%', color: ratioColor(m.manual_ratio) },
+    {
+      label: 'Huella biométrica',
+      value: m.has_biometric_baseline ? `${m.biometric_score ?? 100}% coincidencia` : 'Sin huella',
+      color: m.has_biometric_baseline
+        ? ((m.biometric_score ?? 100) >= 75 ? 'var(--success)' : ((m.biometric_score ?? 100) >= 60 ? 'var(--warning)' : 'var(--danger)'))
+        : 'var(--text-muted)'
+    },
     { label: 'Fuentes registradas', value: m.sources_count },
     { label: 'Fuentes con captura', value: `${m.sources_with_screenshot}/${m.sources_count}` },
   ];
@@ -476,6 +602,30 @@ function showStudentDetail(encodedFilename) {
         `).join('')}
       </div>`
     : `<div style="padding: 12px; background: var(--success-light); border-radius: 7px; color: var(--success); font-size: 0.85rem; margin-bottom: 16px; font-weight: 500;">✓ Sin alertas. El estudiante presenta indicadores de trabajo genuino.</div>`;
+
+  // Huella biométrica del autor
+  const bio = student.biometrics || {};
+  let biometricsCardHTML = '';
+  if (bio.baseline) {
+    const b = bio.baseline;
+    const currentScore = m.biometric_score ?? 100;
+    const scoreColor = currentScore >= 75 ? 'var(--success)' : (currentScore >= 60 ? 'var(--warning)' : 'var(--danger)');
+    biometricsCardHTML = `
+      <div style="margin-bottom: 16px; padding: 14px 16px; background: var(--bg-sidebar); border-radius: 8px; border: 1px solid var(--border);">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+          <span>🎯 Huella digital de escritura (Dinámica de tecleo del autor)</span>
+          <span style="color: var(--success); font-weight: 700;">✓ Calibrada (${b.sample_size || 250} pulsaciones)</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; font-size: 0.82rem;">
+          <div>⏱️ <strong>Permanencia media:</strong><br><span style="font-weight:700; color:var(--primary); font-size:0.95rem;">${b.mean_dwell_ms} ms</span> <span style="font-size:0.73rem; color:var(--text-muted);">(±${b.std_dwell_ms} ms)</span></div>
+          <div>⏸️ <strong>Pausa de vuelo:</strong><br><span style="font-weight:700; color:var(--primary); font-size:0.95rem;">${b.mean_flight_ms} ms</span> <span style="font-size:0.73rem; color:var(--text-muted);">(±${b.std_flight_ms} ms)</span></div>
+          <div>␣ <strong>Espaciadora:</strong><br><span style="font-weight:600;">${b.space_dwell_ms || '—'} ms</span></div>
+          <div>⌫ <strong>Corrección (Backspace):</strong><br><span style="font-weight:600;">${b.backspace_dwell_ms || '—'} ms</span></div>
+          <div>🔒 <strong>Consistencia actual:</strong><br><span style="font-weight:700; color:${scoreColor}; font-size:0.95rem;">${currentScore}%</span></div>
+        </div>
+      </div>
+    `;
+  }
 
   // Fuentes
   const sourcesHTML = (student.sources || []).length > 0
@@ -546,6 +696,7 @@ function showStudentDetail(encodedFilename) {
                 <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Progreso palabras</th>
                 <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Escrito manual</th>
                 <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Pegados</th>
+                <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Biometría sesión</th>
                 <th style="text-align: left; padding: 8px 10px; color: var(--text-muted); font-weight: 600;">Pulsaciones</th>
               </tr>
             </thead>
@@ -557,8 +708,21 @@ function showStudentDetail(encodedFilename) {
                 const timeRange = startTime && endTime ? `${startTime} – ${endTime}` : (startTime || '—');
                 const net = (s.words_net_change !== undefined) ? s.words_net_change : ((s.final_word_count || 0) - (s.initial_word_count || 0));
                 const sign = net > 0 ? '+' : '';
-                const pasteCount = (s.paste_events || []).length;
-                const charsPasted = s.chars_pasted || (s.paste_events || []).reduce((sum, p) => sum + (p.chars_pasted || 0), 0);
+                const nonInitialPastes = (s.paste_events || []).filter(p => !p.is_initial);
+                const pasteCount = nonInitialPastes.length;
+                const charsPasted = nonInitialPastes.reduce((sum, p) => sum + (p.chars_pasted || 0), 0);
+                const hasInitialPaste = (s.paste_events || []).some(p => p.is_initial);
+
+                const sBio = s.biometrics;
+                let bioCell = '<span style="color:var(--text-muted);">—</span>';
+                if (sBio && sBio.similarity_score !== null && sBio.similarity_score !== undefined) {
+                  const isOk = sBio.similarity_score >= 75;
+                  const isWarn = sBio.similarity_score >= 60;
+                  const color = isOk ? 'var(--success)' : (isWarn ? 'var(--warning)' : 'var(--danger)');
+                  bioCell = `<span style="color:${color}; font-weight:600;" title="Permanencia: ${sBio.mean_dwell_ms || '—'}ms, Muestras: ${sBio.samples || 0}">
+                    ${sBio.similarity_score}% ${isOk ? '✓' : (isWarn ? '!' : '⚠')}
+                  </span>`;
+                }
 
                 return `
                   <tr style="border-bottom: 1px solid var(--border);">
@@ -576,8 +740,13 @@ function showStudentDetail(encodedFilename) {
                     </td>
                     <td style="padding: 8px 10px;">${s.words_typed || 0} pal.</td>
                     <td style="padding: 8px 10px;">
-                      ${pasteCount > 0 ? `<span style="color: var(--warning); font-weight: 600;">${pasteCount} (${charsPasted} car.)</span>` : '<span style="color: var(--text-muted);">0</span>'}
+                      ${pasteCount > 0
+                        ? `<span style="color: var(--warning); font-weight: 600;">${pasteCount} (${charsPasted.toLocaleString()} car.)</span>`
+                        : '<span style="color: var(--text-muted);">0</span>'
+                      }
+                      ${hasInitialPaste ? `<span class="badge" style="background: rgba(74, 108, 247, 0.15); color: var(--primary); font-size: 0.68rem; margin-left: 4px; padding: 2px 6px; border-radius: 4px; font-weight: 600;" title="Pegado de material base inicial exento de penalización">Base exenta</span>` : ''}
                     </td>
+                    <td style="padding: 8px 10px;">${bioCell}</td>
                     <td style="padding: 8px 10px; color: var(--text-muted);">${(s.keystroke_count || 0).toLocaleString()}</td>
                   </tr>
                 `;
@@ -590,7 +759,7 @@ function showStudentDetail(encodedFilename) {
         No hay registros individuales de sesiones en este archivo.
        </div>`;
 
-  document.getElementById('detail-tabs-content').innerHTML = alertsHTML + sourcesHTML + sessionsHTML;
+  document.getElementById('detail-tabs-content').innerHTML = alertsHTML + biometricsCardHTML + sourcesHTML + sessionsHTML;
 
   // Mostrar panel
   document.getElementById('student-detail').classList.remove('hidden');
@@ -610,7 +779,9 @@ function exportCSV() {
   const headers = [
     'Estudiante', 'Título del documento', 'Sesiones', 'Días activos',
     '% Manual', 'Caracteres pegados', 'Fuentes totales', 'Fuentes con captura',
-    'Fuentes citadas en texto', 'Total palabras', 'Nivel de alerta', 'Alertas', 'Integridad JSON'
+    'Fuentes citadas en texto', 'Total palabras', 'Huella biométrica',
+    'Similitud biométrica (%)', 'Permanencia media (ms)', 'Pausa de vuelo (ms)',
+    'Nivel de alerta', 'Alertas', 'Integridad JSON'
   ];
 
   const rows = Dash.students.map(s => {
@@ -626,6 +797,10 @@ function exportCSV() {
       m.sources_with_screenshot,
       m.sources_cited_in_text,
       m.word_count,
+      m.has_biometric_baseline ? 'CALIBRADA' : 'SIN HUELLA',
+      m.biometric_score !== null ? m.biometric_score + '%' : 'N/A',
+      m.biometric_dwell || 'N/A',
+      m.biometric_flight || 'N/A',
       alertLevel(s._alerts),
       s._alerts.map(a => a.message).join(' | '),
       m.integrity_ok ? 'OK' : 'MODIFICADO',
@@ -720,4 +895,115 @@ function applyTheme(theme) {
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme') || 'light';
   applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
+/* ================================================================
+   INTEGRACIÓN GOOGLE APPS SCRIPT Y CORREO MASIVO
+   ================================================================ */
+
+let cachedAppsScriptCode = '';
+
+async function loadAppsScriptCodeText() {
+  if (cachedAppsScriptCode) return cachedAppsScriptCode;
+  try {
+    const res = await fetch('codigo_apps_script.gs');
+    if (res.ok) {
+      cachedAppsScriptCode = await res.text();
+      return cachedAppsScriptCode;
+    }
+  } catch (e) {
+    // Si fetch falla por protocolo file://, cargamos fallback seguro
+  }
+  cachedAppsScriptCode = `// 🛰️ EYE ON THE SKY — Google Apps Script (Envío masivo desde Google Sheets)
+// Consulta el archivo completo 'codigo_apps_script.gs' en la carpeta raíz del proyecto.
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('🎓 Eye on the Sky')
+    .addItem('📧 Enviar reportes gráficos a estudiantes', 'enviarReportesEstudiantes')
+    .addItem('👁️ Vista previa del correo', 'previsualizarCorreoFila')
+    .addToUi();
+}
+// Descarga el archivo 'codigo_apps_script.gs' desde el botón de la ventana modal para ver el código completo.`;
+  return cachedAppsScriptCode;
+}
+
+async function openAppsScriptModal() {
+  const modal = document.getElementById('modal-email-apps-script');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+
+  const codeEl = document.getElementById('code-snippet-apps-script');
+  if (codeEl) {
+    const code = await loadAppsScriptCodeText();
+    codeEl.textContent = code;
+  }
+}
+
+function closeAppsScriptModal() {
+  const modal = document.getElementById('modal-email-apps-script');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function copyAppsScriptCode() {
+  const code = await loadAppsScriptCodeText();
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast('✓ ¡Código de Apps Script copiado al portapapeles!', 'success');
+  } catch (err) {
+    // Fallback para entornos donde el clipboard API esté bloqueado
+    const textarea = document.createElement('textarea');
+    textarea.value = code;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    showToast('✓ ¡Código copiado al portapapeles!', 'success');
+  }
+}
+
+function sendIndividualStudentEmail() {
+  const student = Dash.detailStudent;
+  if (!student) {
+    showToast('Por favor selecciona un estudiante primero.', 'warning');
+    return;
+  }
+
+  const m = student._metrics;
+  const nombre = m.student_name || 'Estudiante';
+  const doc = m.doc_title || 'Documento de investigación';
+  const palabras = (m.word_count || 0).toLocaleString();
+  const sesiones = m.total_sessions || 1;
+  const dias = m.total_days_active || 1;
+  const manualPct = Math.round((m.manual_ratio || 1) * 100) + '%';
+  const huella = m.has_biometric_baseline ? `${m.biometric_score ?? 100}% de coincidencia con huella del autor` : 'Aún en calibración';
+  const fuentesCaptura = `${m.sources_with_screenshot || 0} de ${m.sources_count || 0}`;
+
+  const alertas = (student._alerts && student._alerts.length > 0)
+    ? student._alerts.map(a => `• [${a.level.toUpperCase()}] ${a.message}`).join('\n')
+    : '• Sin alertas. Proceso regular y consistente con redacción humana y citas verificadas.';
+
+  const subject = `[Eye on the Sky] Retroalimentación de manuscrito — ${nombre}`;
+  const body = `Estimado/a ${nombre},
+
+Te comparto el estado actual del seguimiento de telemetría y redacción para tu trabajo académico:
+"${doc}"
+
+📊 RESUMEN DE PROGRESO:
+• Palabras actuales: ${palabras}
+• Sesiones de redacción registradas: ${sesiones} (en ${dias} día(s) activo(s))
+• Tasa de escritura manual: ${manualPct}
+• Huella biométrica de autoría: ${huella}
+• Fuentes científicas con evidencia/captura: ${fuentesCaptura}
+
+🔍 OBSERVACIONES DOCENTES Y ALERTAS:
+${alertas}
+
+Continúa con la redacción en la plataforma y recuerda registrar capturas y citas de todas las fuentes científicas consultadas.
+
+Saludos cordiales,
+Profesor del Seminario de Investigación`;
+
+  const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailtoUrl;
+  showToast(`Abriendo cliente de correo para ${nombre}…`, 'info');
 }
