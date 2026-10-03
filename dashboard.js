@@ -154,15 +154,35 @@ async function loadFiles(files) {
 }
 
 async function parseStudentFile(file) {
-  const text   = await file.text();
-  const parsed = JSON.parse(text);
+  let text = '';
+  try {
+    text = await file.text();
+  } catch (readErr) {
+    throw new Error(`No se pudo leer el archivo "${file.name}": ${readErr.message}`);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (parseErr) {
+    throw new Error(`El archivo "${file.name}" contiene JSON inválido o corrupto.`);
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`El archivo "${file.name}" no tiene una estructura de proyecto válida.`);
+  }
 
   // Verificar firma de integridad
   const storedSig = parsed._signature;
   parsed._integrity_ok = false;
   if (storedSig) {
-    const valid = await verifySignature(parsed);
-    parsed._integrity_ok = valid;
+    try {
+      const valid = await verifySignature(parsed);
+      parsed._integrity_ok = valid;
+    } catch (sigErr) {
+      console.warn(`Error al verificar firma en "${file.name}":`, sigErr);
+      parsed._integrity_ok = false;
+    }
   }
 
   parsed._filename = file.name;
@@ -822,10 +842,21 @@ function exportCSV() {
    FIRMA DE INTEGRIDAD (igual que en editor.js)
    ================================================================ */
 
+function safeClone(obj) {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(obj);
+    } catch (e) {
+      // Ignorar fallback
+    }
+  }
+  return JSON.parse(JSON.stringify(obj));
+}
+
 async function verifySignature(payload) {
   const stored = payload._signature;
   if (!stored) return false;
-  const clone = structuredClone(payload);
+  const clone = safeClone(payload);
   delete clone._signature;
   const secret = 'EyeOnTheSky-v1-integrity';
   const data   = secret + JSON.stringify(clone);
@@ -946,18 +977,39 @@ function closeAppsScriptModal() {
 
 async function copyAppsScriptCode() {
   const code = await loadAppsScriptCodeText();
-  try {
-    await navigator.clipboard.writeText(code);
+  let copied = false;
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(code);
+      copied = true;
+    } catch (clipErr) {
+      console.debug('navigator.clipboard falló, intentando método fallback:', clipErr);
+    }
+  }
+
+  if (!copied) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = code;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      textarea.setAttribute('readonly', '');
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (err) {
+      console.warn('Fallback de copia falló:', err);
+    }
+  }
+
+  if (copied) {
     showToast('✓ ¡Código de Apps Script copiado al portapapeles!', 'success');
-  } catch (err) {
-    // Fallback para entornos donde el clipboard API esté bloqueado
-    const textarea = document.createElement('textarea');
-    textarea.value = code;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    showToast('✓ ¡Código copiado al portapapeles!', 'success');
+  } else {
+    showToast('Por favor selecciona el texto en el recuadro inferior para copiarlo manualmente o descarga el archivo .gs', 'info');
   }
 }
 
@@ -1004,6 +1056,12 @@ Saludos cordiales,
 Profesor del Seminario de Investigación`;
 
   const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailtoUrl;
+  const link = document.createElement('a');
+  link.href = mailtoUrl;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
   showToast(`Abriendo cliente de correo para ${nombre}…`, 'info');
 }

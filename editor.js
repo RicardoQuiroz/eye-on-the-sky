@@ -130,7 +130,25 @@ const SoundFx = {
         console.debug('No se pudo inicializar audio:', key, err);
       }
     }
+    this.unlockAudioOnFirstUserGesture();
     this.updateUI();
+  },
+
+  unlockAudioOnFirstUserGesture() {
+    const unlock = () => {
+      document.removeEventListener('pointerdown', unlock, true);
+      document.removeEventListener('keydown', unlock, true);
+      try {
+        const dummy = new Audio();
+        dummy.volume = 0;
+        const p = dummy.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => dummy.pause()).catch(() => {});
+        }
+      } catch (e) {}
+    };
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
   },
 
   play(name) {
@@ -398,11 +416,7 @@ function checkAndRestoreActiveProject() {
       const parsed = JSON.parse(saved);
       if (parsed && (parsed.content || parsed.metadata)) {
         const name = localStorage.getItem('eots_active_project_name') || 'documento.json';
-        // Mostrar brevemente el modal de onboarding antes de restaurar
-        // para que el usuario vea que hay un proyecto que se está cargando
-        const overlay = document.getElementById('modal-onboarding-overlay');
-        // Cerramos el modal después de un pequeño retardo para que sea visible
-        // en iOS durante al menos 400 ms (evita el flash de apertura/cierre)
+        // Cargamos el proyecto restaurado tras un breve retardo para que la interfaz se asiente
         setTimeout(() => {
           loadProjectFromParsedJSON(parsed, name).catch(() => {});
         }, 350);
@@ -532,10 +546,15 @@ function isProjectInitialPaste() {
     return false;
   }
 
-  // 4. Si el proyecto ya tiene más de 2 sesiones consolidadas y >300 palabras escritas,
-  // ya no estamos en la fase inicial de configuración del documento
+  // 4. Si el proyecto ya tiene más de 1 sesión consolidada o >100 palabras previas escritas
   const totalPrevTyped = sessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
-  if (sessions.length > 2 && totalPrevTyped > 300) {
+  if (sessions.length > 1 || totalPrevTyped > 100) {
+    return false;
+  }
+
+  // 5. Si el documento actual ya tiene más de 120 palabras antes del pegado
+  const currentWC = App.quill ? countWords(App.quill.getText()) : 0;
+  if (currentWC > 120) {
     return false;
   }
 
@@ -550,8 +569,8 @@ function handlePasteEvent(e) {
 
   // Determinar si es el primer pegado masivo del documento
   const isInitialPaste = isProjectInitialPaste();
-  const range = App.quill ? App.quill.getSelection(true) : null;
-  const pasteIndex = range ? range.index : 0;
+  const range = App.quill ? App.quill.getSelection() : null;
+  const pasteIndex = (range && typeof range.index === 'number') ? range.index : 0;
 
   // Activar flag para que text-change no cuente estas palabras como manuales
   App.session.isPasting = true;
@@ -560,11 +579,12 @@ function handlePasteEvent(e) {
     // Aplicar color de procedencia en Quill según el tipo de pegado
     if (App.quill && chars > 0) {
       const bgColor = isInitialPaste ? 'rgba(74, 108, 247, 0.16)' : 'rgba(229, 57, 53, 0.18)';
-      // Calcular cuántos caracteres se insertaron realmente (puede diferir del clipboard)
+      // Calcular cuántos caracteres se insertaron realmente dentro de límites válidos
       const currentLen = App.quill.getLength();
-      const insertedChars = Math.min(chars, currentLen - pasteIndex - 1);
+      const safeIndex = Math.min(Math.max(0, pasteIndex), currentLen - 1);
+      const insertedChars = Math.min(chars, Math.max(0, currentLen - safeIndex - 1));
       if (insertedChars > 0) {
-        App.quill.formatText(pasteIndex, insertedChars, 'background', bgColor, 'silent');
+        App.quill.formatText(safeIndex, insertedChars, 'background', bgColor, 'silent');
       }
       // CRÍTICO: Limpiar el formato activo del cursor para que el texto
       // que se escriba a continuación NO herede el color del paste
@@ -575,7 +595,7 @@ function handlePasteEvent(e) {
         App.quill.formatText(sel.index, 0, 'background', false, 'silent');
       }
     }
-  }, 150);
+  }, 120);
 
   const approxWords = Math.round(chars / 5);
 
@@ -619,6 +639,10 @@ function handleKeyUpEvent(e) {
 }
 
 function initSessionTimer() {
+  if (App.session.timer_ref) {
+    clearInterval(App.session.timer_ref);
+    App.session.timer_ref = null;
+  }
   App.session.start_time = new Date();
   App.session.timer_ref = setInterval(() => {
     if (!App.session.start_time) return;
@@ -766,6 +790,7 @@ async function openOrCreateProject(mode) {
 }
 
 async function createNewProjectDirectly() {
+  resetSessionTimers();
   App.dirHandle = null;
   App.capturasHandle = null;
 
@@ -793,6 +818,17 @@ async function createNewProjectDirectly() {
   startAutosave();
   SoundFx.play('session_start');
   showToast('✓ Documento listo. Tu trabajo se guarda continuamente en este dispositivo.', 'success');
+}
+
+function resetSessionTimers() {
+  if (App.session.timer_ref) {
+    clearInterval(App.session.timer_ref);
+    App.session.timer_ref = null;
+  }
+  if (App.session.autosave_ref) {
+    clearInterval(App.session.autosave_ref);
+    App.session.autosave_ref = null;
+  }
 }
 
 function startProjectSession() {
@@ -831,17 +867,13 @@ function startProjectSession() {
     notifiedBaseline: !!(App.project.biometrics && App.project.biometrics.baseline),
   };
 
-  // Reconstruir conjunto de fechas activas
-  App.session.active_days_set = new Set(
-    App.project.telemetry.sessions.map(s => s.date).filter(Boolean)
-  );
-  App.session.active_days_set.add(now.toISOString().split('T')[0]);
-
+  initSessionTimer();
   updateTelemetryUI();
   BiometricsEngine.updateUI();
 }
 
 async function createNewProject(dirHandle) {
+  resetSessionTimers();
   // Inicializar metadatos del proyecto
   App.project.metadata.created_at = new Date().toISOString();
   App.project.metadata.title = 'Sin título';
@@ -854,6 +886,7 @@ async function createNewProject(dirHandle) {
 }
 
 async function loadExistingProject(dirHandle) {
+  resetSessionTimers();
   try {
     let jsonHandle = null;
     let loadedFileName = 'documento.json';
@@ -969,6 +1002,8 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
     throw new Error('El archivo no contiene un formato JSON válido.');
   }
 
+  resetSessionTimers();
+
   // Verificar firma de integridad si existe
   const storedSig = parsed._signature;
   if (storedSig) {
@@ -1036,13 +1071,11 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
   const folderLabel = document.getElementById('open-folder-label');
   if (folderLabel) folderLabel.textContent = sourceName.slice(0, 16) + '…';
 
-  // Guardar en localStorage para que en móviles (Android / iOS) si se recarga la pestaña, se restaure sin modal
-  try {
-    localStorage.setItem('eots_active_project', JSON.stringify(parsed));
-    localStorage.setItem('eots_active_project_name', sourceName);
-  } catch (storageErr) {
-    console.debug('No se pudo guardar respaldo en localStorage:', storageErr);
-  }
+  // Iniciar autoguardado periódico para que la sesión mantenga guardado automático (móvil y PC)
+  startAutosave();
+
+  // Guardar inmediatamente con firma criptográfica válida
+  await saveProject();
 
   // Cerrar siempre el modal de bienvenida
   closeModal('modal-onboarding-overlay');
@@ -1088,8 +1121,26 @@ async function loadProjectFromJSONText(text, sourceName = 'documento_pegado.json
 }
 
 async function openJsonFileDialog() {
-  const input = document.getElementById('onboard-file-input') || document.getElementById('input-load-json-direct');
-  if (input) input.click();
+  const onboardModal = document.getElementById('modal-onboarding-overlay');
+  const isOnboardOpen = onboardModal && onboardModal.classList.contains('open');
+  const input = (isOnboardOpen ? document.getElementById('onboard-file-input') : null) ||
+                document.getElementById('input-load-json-direct') ||
+                document.getElementById('onboard-file-input');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+function safeClone(obj) {
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(obj);
+    } catch (e) {
+      // Ignorar fallback
+    }
+  }
+  return JSON.parse(JSON.stringify(obj));
 }
 
 /* ================================================================
@@ -1207,7 +1258,7 @@ async function saveProject() {
     };
 
     // Crear objeto a serializar (sin imágenes base64 — solo rutas relativas)
-    const payload = structuredClone(App.project);
+    const payload = safeClone(App.project);
 
     // Agregar firma de integridad
     payload._signature = await signPayload(payload);
@@ -1307,7 +1358,7 @@ async function saveProjectWithStats() {
    ================================================================ */
 
 async function signPayload(payload) {
-  const clone = structuredClone(payload);
+  const clone = safeClone(payload);
   delete clone._signature;
   // Usamos una clave estática derivada de la versión de la app
   // (no es criptografía fuerte, pero detecta edición manual del JSON)
@@ -1513,9 +1564,31 @@ function populateCitationSelect() {
   });
 }
 
+function normalizeAuthorName(a) {
+  if (!a) return { lastName: 'Anónimo', firstName: '', raw: 'Anónimo' };
+  const str = a.trim();
+  if (str.includes(',')) {
+    const parts = str.split(',');
+    return {
+      lastName: parts[0].trim(),
+      firstName: parts.slice(1).join(' ').trim(),
+      raw: str
+    };
+  }
+  const tokens = str.split(/\s+/);
+  if (tokens.length >= 2) {
+    return {
+      lastName: tokens[tokens.length - 1],
+      firstName: tokens.slice(0, -1).join(' '),
+      raw: str
+    };
+  }
+  return { lastName: str, firstName: '', raw: str };
+}
+
 function formatCitation(src, pages, style) {
   const authors = src.authors || [];
-  const year    = src.year || 'S.f.';
+  const year    = src.year || 's. f.';
   const title   = src.title || '';
   const journal = src.journal || '';
   const pg      = pages ? (`, ${pages}`) : '';
@@ -1523,7 +1596,13 @@ function formatCitation(src, pages, style) {
   if (style === 'chicago-note' || style === 'chicago-author-date') {
     // Chicago nota completa
     const authorStr = authors.length > 0
-      ? authors.map((a,i) => i === 0 ? a : reverseAuthorName(a)).join(', ')
+      ? authors.map((a, i) => {
+          const norm = normalizeAuthorName(a);
+          if (i === 0) {
+            return norm.firstName ? `${norm.lastName}, ${norm.firstName}` : norm.lastName;
+          }
+          return norm.firstName ? `${norm.firstName} ${norm.lastName}` : norm.lastName;
+        }).join(', ')
       : 'Autor desconocido';
     if (src.type === 'journal') {
       return `${authorStr}, "${title}," <em>${journal}</em> (${year})${pg}.`;
@@ -1532,23 +1611,33 @@ function formatCitation(src, pages, style) {
   }
 
   if (style === 'apa') {
-    const authorStr = authors.map(a => {
-      const parts = a.split(',');
-      return parts.length > 1 ? `${parts[0].trim()}, ${parts[1].trim().charAt(0)}.` : a;
-    }).join(', ');
+    let authorStr = 'Anónimo';
+    if (authors.length === 1) {
+      const n = normalizeAuthorName(authors[0]);
+      authorStr = n.lastName;
+    } else if (authors.length === 2) {
+      const n1 = normalizeAuthorName(authors[0]);
+      const n2 = normalizeAuthorName(authors[1]);
+      authorStr = `${n1.lastName} & ${n2.lastName}`;
+    } else if (authors.length > 2) {
+      const n1 = normalizeAuthorName(authors[0]);
+      authorStr = `${n1.lastName} et al.`;
+    }
     return `(${authorStr}, ${year}${pg})`;
   }
 
   if (style === 'mla') {
-    return `(${authors[0] ? authors[0].split(',')[0] : 'Anón.'} ${pg.replace(', ','')})`;
+    const firstAuthor = authors[0] ? normalizeAuthorName(authors[0]).lastName : 'Anón.';
+    return `(${firstAuthor} ${pg.replace(', ','')})`.replace('  ', ' ');
   }
 
-  return `(${authors[0] ? authors[0].split(',')[0] : 'Anón.'}, ${year}${pg})`;
+  const defaultAuthor = authors[0] ? normalizeAuthorName(authors[0]).lastName : 'Anón.';
+  return `(${defaultAuthor}, ${year}${pg})`;
 }
 
 function reverseAuthorName(name) {
-  const parts = name.split(',');
-  return parts.length > 1 ? `${parts[1].trim()} ${parts[0].trim()}` : name;
+  const norm = normalizeAuthorName(name);
+  return norm.firstName ? `${norm.firstName} ${norm.lastName}` : norm.lastName;
 }
 
 function openCitationModal(sourceId = null) {
@@ -1595,11 +1684,12 @@ function insertCitationIntoEditor() {
   const style    = src.citation_style || 'chicago-note';
   const citation = formatCitation(src, pages, style);
 
-  // Insertar en la posición actual del cursor
-  const range = App.quill.getSelection(true);
-  App.quill.insertText(range.index, citation, 'user');
-  App.quill.formatText(range.index, citation.length, 'background', 'rgba(139, 92, 246, 0.20)');
-  App.quill.setSelection(range.index + citation.length);
+  // Insertar en la posición actual del cursor de forma protegida ante pérdida de foco (ej. en iOS)
+  const range = (App.quill && App.quill.getSelection()) || { index: Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1), length: 0 };
+  const insertIndex = (range && typeof range.index === 'number') ? range.index : Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1);
+  App.quill.insertText(insertIndex, citation, 'user');
+  App.quill.formatText(insertIndex, citation.length, 'background', 'rgba(139, 92, 246, 0.20)');
+  App.quill.setSelection(insertIndex + citation.length);
 
   // Marcar fuente como citada
   src.cited_in_text = true;
@@ -1615,12 +1705,7 @@ function insertCitationIntoEditor() {
    ================================================================ */
 
 async function insertScreenshotAtCursor() {
-  if (!App.capturasHandle) {
-    showToast('Primero debes abrir o crear un proyecto (carpeta).', 'warning');
-    return;
-  }
-
-  // Crear un input temporal para seleccionar imagen
+  // Crear un input temporal para seleccionar imagen (funciona tanto en PC con carpeta como en móviles)
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -1634,30 +1719,34 @@ async function insertScreenshotAtCursor() {
 
 async function embedScreenshotInEditor(file) {
   try {
-    // Guardar en carpeta capturas/
-    const ext      = file.name.split('.').pop();
+    const ext = ((file.name || 'captura.png').split('.').pop() || 'png').toLowerCase();
     const filename = `captura_${Date.now()}.${ext}`;
-    const fh  = await App.capturasHandle.getFileHandle(filename, { create: true });
-    const wr  = await fh.createWritable();
-    await wr.write(file);
-    await wr.close();
 
-    // Crear blob URL para mostrar en el editor (sesión actual)
-    const blobUrl = URL.createObjectURL(file);
+    // Si hay acceso a disco (PC con carpeta abierta), guardar físicamente en capturas/
+    if (App.capturasHandle) {
+      try {
+        const fh = await App.capturasHandle.getFileHandle(filename, { create: true });
+        const wr = await fh.createWritable();
+        await wr.write(file);
+        await wr.close();
+      } catch (fsErr) {
+        console.warn('No se pudo guardar archivo físico en capturas/:', fsErr);
+      }
+    }
 
-    // Insertar como bloque colapsable (details/summary) en el HTML
-    const range = App.quill.getSelection(true);
-    // Quill no soporta natively <details>, así que insertamos un marcador
-    // y lo reemplazamos en el HTML final para exportación
+    // Insertar marcador en el editor en la posición del cursor de forma protegida
+    const range = (App.quill && App.quill.getSelection()) || { index: Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1) };
+    const insertIndex = (range && typeof range.index === 'number') ? range.index : Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1);
     const placeholder = `[📸 Captura: ${filename}]`;
-    App.quill.insertText(range.index, placeholder, { bold: false, italic: true, color: '#4a6cf7' }, 'user');
+    App.quill.insertText(insertIndex, placeholder, { bold: false, italic: true, color: '#4a6cf7' }, 'user');
 
-    // Guardar referencia en el proyecto
+    // Guardar referencia persistente en el proyecto SIN blob_url efímero
     if (!App.project.inline_screenshots) App.project.inline_screenshots = {};
     App.project.inline_screenshots[placeholder] = {
       filename,
       inserted_at: new Date().toISOString(),
-      blob_url: blobUrl,
+      size: file.size || 0,
+      mime_type: file.type || 'image/png'
     };
 
     App.ui.isDirty = true;
@@ -1735,17 +1824,62 @@ async function exportToDocx() {
     return;
   }
 
-  showToast('Generando documento Word…', 'success');
+  showToast('Generando documento Word…', 'info');
 
   const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = window.docx;
 
-  const title    = App.project.metadata.title || 'Sin título';
-  const htmlText = App.quill.getText();
-  const lines    = htmlText.split('\n').filter(l => l.trim());
+  const title = App.project.metadata.title || 'Sin título';
+  const delta = App.quill ? App.quill.getContents() : null;
+  const paragraphs = [];
 
-  const paragraphs = lines.map(line => {
-    return new Paragraph({ children: [new TextRun(line)], spacing: { after: 200 } });
-  });
+  if (delta && Array.isArray(delta.ops)) {
+    let currentRuns = [];
+    delta.ops.forEach(op => {
+      if (typeof op.insert === 'string') {
+        const parts = op.insert.split('\n');
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i].length > 0) {
+            currentRuns.push(new TextRun({
+              text: parts[i],
+              bold: !!op.attributes?.bold,
+              italics: !!op.attributes?.italic,
+              underline: !!op.attributes?.underline ? {} : undefined,
+            }));
+          }
+          if (i < parts.length - 1) {
+            let align = AlignmentType.LEFT;
+            if (op.attributes?.align === 'center') align = AlignmentType.CENTER;
+            else if (op.attributes?.align === 'right') align = AlignmentType.RIGHT;
+            else if (op.attributes?.align === 'justify') align = AlignmentType.JUSTIFIED;
+
+            let heading = undefined;
+            if (op.attributes?.header === 1) heading = HeadingLevel.HEADING_1;
+            else if (op.attributes?.header === 2) heading = HeadingLevel.HEADING_2;
+            else if (op.attributes?.header === 3) heading = HeadingLevel.HEADING_3;
+
+            paragraphs.push(new Paragraph({
+              children: currentRuns.length > 0 ? currentRuns : [new TextRun('')],
+              alignment: align,
+              heading: heading,
+              spacing: { after: 180, line: 276 }
+            }));
+            currentRuns = [];
+          }
+        }
+      }
+    });
+    if (currentRuns.length > 0) {
+      paragraphs.push(new Paragraph({
+        children: currentRuns,
+        spacing: { after: 180, line: 276 }
+      }));
+    }
+  } else {
+    const rawLines = (App.quill ? App.quill.getText() : '').split('\n').filter(l => l.trim());
+    rawLines.forEach(l => {
+      paragraphs.push(new Paragraph({ children: [new TextRun(l)], spacing: { after: 180 } }));
+    });
+  }
 
   // Bibliografía al final
   const bibParagraphs = [
@@ -1818,7 +1952,7 @@ function exportToRIS() {
 // --- Copia de seguridad del JSON ---
 async function exportJSON() {
   await saveProject(); // guardar primero
-  const payload = structuredClone(App.project);
+  const payload = safeClone(App.project);
   payload._signature = await signPayload(payload);
   const blob  = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const title = App.project.metadata.title || 'documento';
@@ -1834,13 +1968,17 @@ async function exportJSON() {
 function downloadBlob(blob, filename, type) {
   const url = URL.createObjectURL(blob);
   const a   = document.createElement('a');
-  a.href = url; a.download = filename;
+  a.href = url;
+  a.download = filename;
+  if (type) a.type = type;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 function countWords(text) {
-  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  return (text || '').trim().split(/\s+/).filter(w => w.length > 0).length;
 }
 
 function updateWordCount(count) {
@@ -1880,7 +2018,16 @@ function escapeHtml(str) {
 }
 
 function slugify(str) {
-  return str.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'').substring(0,60) || 'documento';
+  if (!str) return 'documento';
+  return str
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // convierte á->a, é->e, ñ->n, etc.
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '')
+    .substring(0, 60) || 'documento';
 }
 
 function typeLabel(type) {
@@ -2143,9 +2290,16 @@ function initEventListeners() {
     }
   });
 
-  // Guardado automático al cambiar de pestaña o minimizar ventana
+  // Guardado automático al cambiar de pestaña o minimizar ventana (PC y móviles Android/iOS)
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && App.ui.isDirty && App.dirHandle) {
+    if (document.visibilityState === 'hidden' && App.ui.isDirty && App.ui.projectLoaded) {
+      saveProject();
+    }
+  });
+
+  // Guardado crítico en iOS Safari y móviles al suspender o cambiar de app
+  window.addEventListener('pagehide', () => {
+    if (App.ui.isDirty && App.ui.projectLoaded) {
       saveProject();
     }
   });
@@ -2153,10 +2307,20 @@ function initEventListeners() {
   // Aviso antes de cerrar si hay cambios
   window.addEventListener('beforeunload', (e) => {
     if (App.ui.isDirty && App.ui.projectLoaded) {
-      if (App.dirHandle) saveProject();
+      saveProject();
       e.preventDefault();
       e.returnValue = '';
     }
+  });
+
+  // Adaptar interfaz ante rotación o cambio de tamaño de ventana (portrait <-> landscape)
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      adaptUIForPlatform();
+      updatePanelBackdrop();
+    }, 200);
   });
 
   // Botón de guardado manual con estadísticas (desktop)
