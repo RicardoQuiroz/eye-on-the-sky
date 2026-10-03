@@ -7,7 +7,7 @@
   <meta name="description" content="Entorno de redacción académica supervisada para seminarios de investigación." />
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="styles.css" />
   <!-- Quill editor -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
 </head>
@@ -54,6 +54,11 @@
       <button class="btn btn-ghost btn-sm btn-icon" id="btn-sound-toggle" title="Efectos de sonido (Activados)">
         <svg id="sound-icon-on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
         <svg id="sound-icon-off" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+      </button>
+
+      <!-- Botón Guardar Manual -->
+      <button class="btn btn-ghost btn-sm btn-icon" id="btn-manual-save" title="Guardar ahora y ver estadísticas de la sesión">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       </button>
 
       <!-- Menú de exportación -->
@@ -194,9 +199,21 @@
         <div class="mobile-menu-group">
           <div class="mobile-menu-group-title">Archivo y Guardado</div>
 
+          <!-- Guardar ahora con estadísticas -->
+          <button class="mobile-menu-item" id="mob-btn-manual-save">
+            <div class="mob-item-icon" style="color: var(--accent);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            </div>
+            <div class="mob-item-text">
+              <div class="mob-item-label">Guardar ahora</div>
+              <div class="mob-item-desc">Ver estadísticas de la sesión actual</div>
+            </div>
+            <span class="mob-item-badge" style="color: var(--accent);">💾</span>
+          </button>
+
           <button class="mobile-menu-item" id="mob-btn-save-json">
             <div class="mob-item-icon" style="color: var(--success);">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
             </div>
             <div class="mob-item-text">
               <div class="mob-item-label">Descargar copia (.json)</div>
@@ -304,7 +321,12 @@
       </span>
       <!-- Alineación -->
       <span class="ql-formats">
-        <select class="ql-align"></select>
+        <select class="ql-align">
+          <option selected></option>
+          <option value="center"></option>
+          <option value="right"></option>
+          <option value="justify"></option>
+        </select>
       </span>
       <!-- Limpiar formato -->
       <span class="ql-formats">
@@ -329,6 +351,9 @@
        LAYOUT PRINCIPAL
   ══════════════════════════════════════════════ -->
   <div id="main-layout">
+
+    <!-- Overlay para cerrar paneles al tocar fuera en móvil -->
+    <div id="panel-backdrop"></div>
 
     <!-- Sidebar de fuentes (izquierda) -->
     <aside id="sidebar-sources">
@@ -725,6 +750,69 @@
 </div>
 
 <!-- ══════════════════════════════════════════════
+     MODAL: Guardado manual — Estadísticas de sesión
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-save-stats-overlay">
+  <div class="modal" style="max-width: 500px;" role="dialog" aria-modal="true" aria-labelledby="modal-save-stats-title">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.2rem;">💾</span>
+        <h3 id="modal-save-stats-title" style="margin: 0; font-size: 1rem;">Proyecto Guardado</h3>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="close-modal-save-stats" aria-label="Cerrar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Título del documento -->
+      <div style="margin-bottom: 16px; padding: 12px 14px; background: var(--accent-light); border-radius: 8px; border: 1px solid rgba(74,108,247,0.2);">
+        <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 4px;">Documento</div>
+        <div id="stats-doc-title" style="font-size: 1rem; font-weight: 600; color: var(--text-primary);">Sin título</div>
+        <div id="stats-doc-saved-at" style="font-size: 0.74rem; color: var(--text-muted); margin-top: 3px;"></div>
+      </div>
+
+      <!-- Grid de estadísticas -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-word-count">0</div>
+          <div class="stats-card-label">Palabras totales</div>
+        </div>
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-words-typed">0</div>
+          <div class="stats-card-label">Palabras escritas (sesión)</div>
+        </div>
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-manual-ratio">100%</div>
+          <div class="stats-card-label">Escritura manual</div>
+        </div>
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-session-time">00:00</div>
+          <div class="stats-card-label">Tiempo de sesión</div>
+        </div>
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-sources-count">0</div>
+          <div class="stats-card-label">Fuentes bibliográficas</div>
+        </div>
+        <div class="stats-card-item">
+          <div class="stats-card-value" id="stats-paste-events">0</div>
+          <div class="stats-card-label">Eventos de pegado</div>
+        </div>
+      </div>
+
+      <!-- Tamaño del JSON guardado -->
+      <div style="padding: 10px 14px; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary);">Tamaño del proyecto guardado</span>
+        <span id="stats-json-size" style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">—</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="btn-save-stats-download">Descargar copia .json</button>
+      <button class="btn btn-primary" id="btn-save-stats-close">Continuar redactando</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
      MODAL: Huella Biométrica Establecida
 ══════════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-biometrics-overlay">
@@ -776,7 +864,7 @@
 <!-- JSZip -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Lógica principal -->
-<script src="js/editor.js"></script>
+<script src="editor.js"></script>
 
 </body>
 </html>
