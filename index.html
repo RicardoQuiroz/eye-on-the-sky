@@ -6,10 +6,10 @@
   <title>Eye on the Sky — Editor</title>
   <meta name="description" content="Entorno de redacción académica supervisada para seminarios de investigación." />
 
-  <!-- Estilos -->
-  <link rel="stylesheet" href="styles.css" />
   <!-- Quill editor -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+  <!-- Estilos de la aplicación -->
+  <link rel="stylesheet" href="styles.css?v=1.1" />
 </head>
 <body>
 
@@ -299,51 +299,62 @@
   ══════════════════════════════════════════════ -->
   <div id="toolbar-wrapper">
     <div id="quill-toolbar">
-      <!-- Encabezados -->
-      <span class="ql-formats">
-        <select class="ql-header">
-          <option value="1">Título 1</option>
-          <option value="2">Título 2</option>
-          <option value="3">Título 3</option>
-          <option selected>Normal</option>
-        </select>
-      </span>
-      <!-- Formato básico -->
-      <span class="ql-formats">
-        <button class="ql-bold"></button>
-        <button class="ql-italic"></button>
-        <button class="ql-underline"></button>
-      </span>
-      <!-- Listas -->
-      <span class="ql-formats">
-        <button class="ql-list" value="ordered"></button>
-        <button class="ql-list" value="bullet"></button>
-      </span>
-      <!-- Alineación -->
-      <span class="ql-formats">
-        <select class="ql-align">
-          <option selected></option>
-          <option value="center"></option>
-          <option value="right"></option>
-          <option value="justify"></option>
-        </select>
-      </span>
-      <!-- Limpiar formato -->
-      <span class="ql-formats">
-        <button class="ql-clean"></button>
-      </span>
-    </div>
+      <!-- Fila 1 (Móvil: fila superior / Desktop: bloque de encabezados y citas) -->
+      <div class="toolbar-row toolbar-row-top">
+        <!-- Encabezados -->
+        <span class="ql-formats">
+          <select class="ql-header" title="Estilos de título">
+            <option value="1">Título 1</option>
+            <option value="2">Título 2</option>
+            <option value="3">Título 3</option>
+            <option value="4">Título 4</option>
+            <option value="5">Título 5</option>
+            <option selected>Normal</option>
+          </select>
+        </span>
 
-    <!-- Botones personalizados -->
-    <div class="toolbar-group" style="border-left: 1px solid var(--border); margin-left: 8px; padding-left: 12px;">
-      <button class="btn btn-ghost btn-sm" id="btn-insert-citation" title="Insertar cita bibliográfica">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
-        Citar fuente
-      </button>
-      <button class="btn btn-ghost btn-sm" id="btn-insert-screenshot" title="Insertar captura de pantalla PDF">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Insertar captura PDF
-      </button>
+        <!-- Botones personalizados (Citas y capturas PDF) -->
+        <div class="toolbar-group toolbar-custom-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-insert-citation" title="Insertar cita bibliográfica">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+            <span class="btn-text-full">Citar fuente</span>
+            <span class="btn-text-short">Citar</span>
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-insert-screenshot" title="Insertar captura de pantalla PDF">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="btn-text-full">Insertar captura PDF</span>
+            <span class="btn-text-short">Captura PDF</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Fila 2 (Móvil: fila inferior / Desktop: bloque de formato en línea) -->
+      <div class="toolbar-row toolbar-row-bottom">
+        <!-- Formato básico -->
+        <span class="ql-formats">
+          <button class="ql-bold" title="Negrita"></button>
+          <button class="ql-italic" title="Cursiva"></button>
+          <button class="ql-underline" title="Subrayado"></button>
+        </span>
+        <!-- Listas -->
+        <span class="ql-formats">
+          <button class="ql-list" value="ordered" title="Lista numerada"></button>
+          <button class="ql-list" value="bullet" title="Lista con viñetas"></button>
+        </span>
+        <!-- Alineación -->
+        <span class="ql-formats">
+          <select class="ql-align" title="Alineación">
+            <option selected></option>
+            <option value="center"></option>
+            <option value="right"></option>
+            <option value="justify"></option>
+          </select>
+        </span>
+        <!-- Limpiar formato -->
+        <span class="ql-formats">
+          <button class="ql-clean" title="Limpiar formato (eliminar estilos del texto seleccionado)"></button>
+        </span>
+      </div>
     </div>
   </div>
 

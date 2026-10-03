@@ -1856,6 +1856,8 @@ async function exportToDocx() {
             if (op.attributes?.header === 1) heading = HeadingLevel.HEADING_1;
             else if (op.attributes?.header === 2) heading = HeadingLevel.HEADING_2;
             else if (op.attributes?.header === 3) heading = HeadingLevel.HEADING_3;
+            else if (op.attributes?.header === 4) heading = HeadingLevel.HEADING_4;
+            else if (op.attributes?.header === 5) heading = HeadingLevel.HEADING_5;
 
             paragraphs.push(new Paragraph({
               children: currentRuns.length > 0 ? currentRuns : [new TextRun('')],

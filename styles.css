@@ -209,11 +209,17 @@ body {
   display: flex;
   align-items: center;
   min-height: var(--toolbar-height);
-  gap: 4px;
-  flex-wrap: wrap;
   overflow: visible;   /* visible para que los pickers de Quill no queden recortados */
   position: relative;
-  z-index: 90;
+  z-index: 95;
+}
+
+#quill-toolbar {
+  border: none !important;
+  padding: 0 !important;
+  position: relative;
+  overflow: visible;
+  width: 100%;
 }
 
 .toolbar-group {
@@ -221,10 +227,32 @@ body {
   align-items: center;
   gap: 2px;
   padding: 0 4px;
-  border-right: 1px solid var(--border);
 }
 
-.toolbar-group:last-child { border-right: none; }
+.toolbar-custom-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-custom-actions .btn {
+  width: auto !important;
+  height: 28px !important;
+  float: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  padding: 4px 10px !important;
+  font-size: 0.78rem !important;
+}
+
+.btn-text-short {
+  display: none;
+}
+.btn-text-full {
+  display: inline;
+}
 
 /* ---- Layout de 3 paneles ---- */
 #main-layout {
@@ -312,6 +340,8 @@ body {
 .ql-editor h1 { font-size: 1.6rem; font-weight: 700; margin: 1.4em 0 0.6em; }
 .ql-editor h2 { font-size: 1.25rem; font-weight: 600; margin: 1.2em 0 0.5em; }
 .ql-editor h3 { font-size: 1.05rem; font-weight: 600; margin: 1em 0 0.4em; }
+.ql-editor h4 { font-size: 0.95rem; font-weight: 600; margin: 0.9em 0 0.35em; }
+.ql-editor h5 { font-size: 0.85rem; font-weight: 600; margin: 0.8em 0 0.3em; }
 .ql-editor p  { margin: 0 0 0.9em; }
 
 /* Bloque de captura de pantalla incrustada */
@@ -467,17 +497,32 @@ body {
 .ql-toolbar button svg .ql-fill  { fill: currentColor !important; }
 .ql-picker-label { color: var(--text-secondary) !important; }
 
-/* Z-index para que los pickers de Quill aparezcan sobre el contenido */
+/* Z-index para que los pickers de Quill aparezcan sobre el contenido sin ser recortados */
 .ql-picker-options {
-  z-index: 200 !important;
+  z-index: 300 !important;
   background: var(--bg-surface) !important;
   border: 1px solid var(--border) !important;
   border-radius: 6px !important;
-  box-shadow: var(--shadow-md) !important;
+  box-shadow: var(--shadow-lg) !important;
   padding: 4px !important;
+  max-height: 280px;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
-.ql-picker-options .ql-picker-item { color: var(--text-primary) !important; padding: 5px 8px !important; border-radius: 4px; }
+.ql-picker-options .ql-picker-item {
+  color: var(--text-primary) !important;
+  padding: 6px 10px !important;
+  border-radius: 4px;
+}
 .ql-picker-options .ql-picker-item:hover { background: var(--bg-hover) !important; }
+
+/* Tipografía jerárquica para opciones de encabezados en el dropdown */
+.ql-picker.ql-header .ql-picker-item[data-value="1"] { font-size: 1.25rem !important; font-weight: 700; }
+.ql-picker.ql-header .ql-picker-item[data-value="2"] { font-size: 1.12rem !important; font-weight: 600; }
+.ql-picker.ql-header .ql-picker-item[data-value="3"] { font-size: 1.0rem !important; font-weight: 600; }
+.ql-picker.ql-header .ql-picker-item[data-value="4"] { font-size: 0.92rem !important; font-weight: 600; }
+.ql-picker.ql-header .ql-picker-item[data-value="5"] { font-size: 0.85rem !important; font-weight: 600; }
+.ql-picker.ql-header .ql-picker-item:not([data-value]) { font-size: 0.85rem !important; font-weight: normal; }
 
 /* ================================================================
    TARJETAS DE FUENTE
@@ -1270,6 +1315,38 @@ body {
   .mobile-drawer-overlay {
     display: none !important;
   }
+
+  /* Toolbar en desktop: alineado en una sola fila fluida */
+  #quill-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+  }
+  .toolbar-row-top {
+    display: contents !important;
+  }
+  .toolbar-row-top > .ql-formats {
+    order: 1 !important;
+  }
+  .toolbar-row-bottom {
+    order: 2 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 0 8px;
+  }
+  .toolbar-custom-actions {
+    order: 3 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding-left: 8px !important;
+    border-left: 1px solid var(--border) !important;
+    margin-left: 4px !important;
+  }
 }
 
 /* Pantallas móviles / Tablets estrechas (<= 768px): Menú hamburguesa y drawer */
@@ -1357,14 +1434,88 @@ body {
   }
 
   #toolbar-wrapper {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 6px;
+    overflow: visible !important;
+    padding: 6px 10px;
+    min-height: auto;
   }
 
-  .toolbar-group {
+  #quill-toolbar {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 6px !important;
+    overflow: visible !important;
+  }
+
+  .toolbar-row {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .toolbar-row-top {
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .toolbar-row-top > .ql-formats {
+    margin-right: 0 !important;
     flex-shrink: 0;
+  }
+
+  .toolbar-custom-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px;
+    margin-left: auto;
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+
+  .toolbar-row-bottom {
+    justify-content: flex-start;
+    gap: 3px;
+    padding-top: 5px;
+    border-top: 1px solid var(--border);
+  }
+
+  .toolbar-row-bottom .ql-formats {
+    margin-right: 6px !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .toolbar-row-bottom .ql-formats:last-child {
+    margin-right: 0 !important;
+  }
+
+  /* Textos compactos en botones móviles */
+  .btn-text-full { display: none !important; }
+  .btn-text-short { display: inline !important; }
+
+  /* Botones de acción personalizada (Citar, Captura PDF) con ancho auto y padding balanceado */
+  .toolbar-custom-actions .btn {
+    width: auto !important;
+    height: 30px !important;
+    padding: 4px 8px !important;
+    font-size: 0.76rem !important;
+    gap: 5px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 6px !important;
+    background: var(--bg-surface) !important;
+    flex-shrink: 0;
+  }
+
+  /* Tamaño táctil para botones de iconos de formato en fila 2 */
+  #quill-toolbar .ql-formats button {
+    width: 32px !important;
+    height: 30px !important;
+    padding: 4px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   #statusbar {
