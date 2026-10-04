@@ -2315,6 +2315,15 @@ function initEventListeners() {
     }
   });
 
+  // Notificaciones de estado de conexión (offline / online)
+  window.addEventListener('offline', () => {
+    showToast('Estás trabajando sin conexión. Tus avances se siguen guardando localmente.', 'info');
+  });
+  window.addEventListener('online', () => {
+    showToast('Conexión a internet restablecida.', 'success');
+  });
+
+
   // Adaptar interfaz ante rotación o cambio de tamaño de ventana (portrait <-> landscape)
   let resizeTimer = null;
   window.addEventListener('resize', () => {

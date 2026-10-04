@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Eye on the Sky — Dashboard Docente</title>
   <meta name="description" content="Panel de monitoreo del docente para el seguimiento del trabajo de investigación de los estudiantes." />
+  <meta name="theme-color" content="#4a6cf7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="stylesheet" href="styles.css" />
   <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -293,5 +299,15 @@
 <div id="toast-container"></div>
 
 <script src="dashboard.js"></script>
+<!-- Registro de Service Worker para soporte Offline / PWA -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then((reg) => console.log('Eye on the Sky: Service Worker activo en', reg.scope))
+        .catch((err) => console.warn('Eye on the Sky: Error registrando Service Worker:', err));
+    });
+  }
+</script>
 </body>
 </html>

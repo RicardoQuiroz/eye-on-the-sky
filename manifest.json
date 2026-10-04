@@ -1,0 +1,19 @@
+{
+  "name": "Eye on the Sky — Editor Académico",
+  "short_name": "Eye on the Sky",
+  "description": "Entorno de redacción académica supervisada para seminarios de investigación con soporte offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f0f2f5",
+  "theme_color": "#4a6cf7",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
