@@ -15,7 +15,7 @@
   <!-- Quill editor -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
   <!-- Estilos de la aplicación -->
-  <link rel="stylesheet" href="styles.css?v=1.3" />
+  <link rel="stylesheet" href="styles.css?v=1.4" />
 </head>
 <body>
 
@@ -107,6 +107,31 @@
       </button>
 
       <input type="file" id="input-load-json-direct" accept=".json,application/json,text/plain,*/*" class="hidden" />
+    </div>
+
+    <!-- Accesos directos coloreados para Fuentes, TOC y Salud/Actividad -->
+    <div class="header-nav-shortcuts" id="header-nav-shortcuts">
+      <button type="button" class="btn-nav-shortcut nav-shortcut-sources" id="btn-nav-sources" title="Panel de Fuentes bibliográficas" aria-label="Abrir panel de fuentes" onclick="openSourcesPanel()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+      </button>
+      <button type="button" class="btn-nav-shortcut nav-shortcut-toc" id="btn-nav-toc" title="Índice / Tabla de Contenidos (TOC)" aria-label="Abrir índice TOC" onclick="openTocPanel()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </button>
+      <button type="button" class="btn-nav-shortcut nav-shortcut-tele" id="btn-nav-tele" title="Panel de Actividad y Salud (Telemetría)" aria-label="Abrir panel de actividad y salud" onclick="toggleTelemetryPanel()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Botón Menú Hamburguesa (Móviles / Pantallas pequeñas) -->
@@ -336,11 +361,6 @@
             <span class="btn-text-full">Tabla</span>
             <span class="btn-text-short">Tabla</span>
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-insert-toc-tb" title="Insertar Índice general en el documento">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            <span class="btn-text-full">Índice</span>
-            <span class="btn-text-short">Índice</span>
-          </button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-insert-bib-tb" title="Insertar Bibliografía en el documento">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             <span class="btn-text-full">Bibliografía</span>
@@ -433,14 +453,15 @@
 
       <!-- Vista 2: Tabla de Contenidos / Estructura -->
       <div class="sidebar-panel-view hidden" id="view-toc">
-        <div class="sidebar-header">
+        <div class="sidebar-header" style="flex-wrap: wrap; gap: 8px;">
           <span>Índice / Esquema</span>
-          <div style="display: flex; gap: 4px; align-items: center;">
+          <div style="display: flex; gap: 6px; align-items: center;">
             <button class="btn btn-ghost btn-sm btn-icon" id="btn-refresh-toc" title="Actualizar índice">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
-            <button class="btn btn-ghost btn-sm" id="btn-insert-toc" title="Insertar índice en el documento" style="font-size: 0.72rem; padding: 2px 7px;">
-              Insertar
+            <button class="btn btn-primary btn-sm" id="btn-insert-toc" title="Insertar Índice general en el documento" style="font-size: 0.76rem; padding: 3px 9px; display: inline-flex; align-items: center; gap: 4px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Insertar índice</span>
             </button>
           </div>
         </div>
@@ -580,10 +601,6 @@
     <div class="status-item" id="sb-cursor-pos-container" style="margin-left: auto;" title="Posición del cursor">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
       <span id="sb-cursor-pos-indicator">Línea 1 de Pág. 1</span>
-    </div>
-    <div class="status-item" id="sb-page-container" title="Página actual del documento">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-      <span id="sb-page-indicator">Pág. 1 de 1</span>
     </div>
   </footer>
 
@@ -989,7 +1006,7 @@
 <!-- JSZip -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Lógica principal -->
-<script src="editor.js?v=1.3"></script>
+<script src="editor.js?v=1.4"></script>
 
 <!-- Registro de Service Worker para soporte Offline / PWA -->
 <script>

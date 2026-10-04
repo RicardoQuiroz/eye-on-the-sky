@@ -1167,6 +1167,67 @@ body {
    BOTÓN HAMBURGUESA Y DRAWER MÓVIL (RESPONSIVE)
    ================================================================ */
 
+/* Accesos directos coloreados en cabecera (Fuentes, TOC, Salud) */
+.header-nav-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.btn-nav-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  padding: 0;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 1. Fuentes bibliográficas (Verde Esmeralda) */
+.nav-shortcut-sources {
+  color: #10b981;
+}
+.nav-shortcut-sources:hover,
+.nav-shortcut-sources:active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+
+/* 2. TOC / Índice (Celeste vibrante) */
+.nav-shortcut-toc {
+  color: #0284c7;
+}
+[data-theme="dark"] .nav-shortcut-toc {
+  color: #38bdf8;
+}
+.nav-shortcut-toc:hover,
+.nav-shortcut-toc:active {
+  background: rgba(2, 132, 199, 0.16);
+  border-color: rgba(2, 132, 199, 0.4);
+  transform: translateY(-1px);
+}
+
+/* 3. Actividad y salud (Rosa / Coral / Pulso) */
+.nav-shortcut-tele {
+  color: #f43f5e;
+}
+.nav-shortcut-tele:hover,
+.nav-shortcut-tele:active {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: rgba(244, 63, 94, 0.4);
+  transform: translateY(-1px);
+}
+
 #btn-hamburger-menu {
   display: none;
   align-items: center;
@@ -1607,28 +1668,33 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  height: 0;
-  border-top: 1.5px dashed rgba(74, 108, 247, 0.45);
+  height: 38px;
+  background: var(--bg-app);
+  border-top: 1.5px solid var(--border);
+  border-bottom: 1.5px solid var(--border);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.06), inset 0 -2px 5px rgba(0, 0, 0, 0.06);
   pointer-events: none;
-  z-index: 2;
+  z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 14px;
+  justify-content: center;
+  transform: translateY(-50%);
 }
 
 .page-break-badge {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
   background: var(--bg-surface);
-  border: 1px solid rgba(74, 108, 247, 0.35);
-  border-radius: 10px;
-  padding: 1px 8px;
-  transform: translateY(-50%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 3px 14px;
   user-select: none;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ---- Indicador de página en la barra de scroll ---- */

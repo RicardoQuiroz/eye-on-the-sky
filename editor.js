@@ -2245,32 +2245,79 @@ function initEventListeners() {
     }
   });
 
-  // Toggle sidebars
-  document.getElementById('btn-toggle-sources').addEventListener('click', () => {
+  // Funciones de control de paneles laterales
+  function openSourcesPanel() {
     const sidebar = document.getElementById('sidebar-sources');
-    App.ui.sourcesPanelOpen = !App.ui.sourcesPanelOpen;
-    sidebar.classList.toggle('collapsed', !App.ui.sourcesPanelOpen);
-    // En pantallas pequeñas, cerrar el otro panel al abrir uno
-    if (App.ui.sourcesPanelOpen && window.innerWidth <= 900) {
+    if (!sidebar) return;
+    App.ui.sourcesPanelOpen = true;
+    sidebar.classList.remove('collapsed');
+    switchSidebarTab('sources');
+    if (window.innerWidth <= 900) {
       const tele = document.getElementById('sidebar-telemetry');
       App.ui.telePanelOpen = false;
       if (tele) tele.classList.add('collapsed');
     }
     updatePanelBackdrop();
-  });
+  }
+  window.openSourcesPanel = openSourcesPanel;
 
-  document.getElementById('btn-toggle-tele').addEventListener('click', () => {
+  function openTocPanel() {
+    const sidebar = document.getElementById('sidebar-sources');
+    if (!sidebar) return;
+    App.ui.sourcesPanelOpen = true;
+    sidebar.classList.remove('collapsed');
+    switchSidebarTab('toc');
+    if (window.innerWidth <= 900) {
+      const tele = document.getElementById('sidebar-telemetry');
+      App.ui.telePanelOpen = false;
+      if (tele) tele.classList.add('collapsed');
+    }
+    updatePanelBackdrop();
+  }
+  window.openTocPanel = openTocPanel;
+
+  function toggleTelemetryPanel() {
     const sidebar = document.getElementById('sidebar-telemetry');
+    if (!sidebar) return;
     App.ui.telePanelOpen = !App.ui.telePanelOpen;
     sidebar.classList.toggle('collapsed', !App.ui.telePanelOpen);
-    // En pantallas pequeñas, cerrar el otro panel al abrir uno
     if (App.ui.telePanelOpen && window.innerWidth <= 900) {
       const src = document.getElementById('sidebar-sources');
       App.ui.sourcesPanelOpen = false;
       if (src) src.classList.add('collapsed');
     }
     updatePanelBackdrop();
-  });
+  }
+  window.toggleTelemetryPanel = toggleTelemetryPanel;
+
+  // Toggle sidebars botones originales
+  const btnToggleSources = document.getElementById('btn-toggle-sources');
+  if (btnToggleSources) {
+    btnToggleSources.addEventListener('click', () => {
+      const sidebar = document.getElementById('sidebar-sources');
+      App.ui.sourcesPanelOpen = !App.ui.sourcesPanelOpen;
+      sidebar.classList.toggle('collapsed', !App.ui.sourcesPanelOpen);
+      if (App.ui.sourcesPanelOpen && window.innerWidth <= 900) {
+        const tele = document.getElementById('sidebar-telemetry');
+        App.ui.telePanelOpen = false;
+        if (tele) tele.classList.add('collapsed');
+      }
+      updatePanelBackdrop();
+    });
+  }
+
+  const btnToggleTele = document.getElementById('btn-toggle-tele');
+  if (btnToggleTele) {
+    btnToggleTele.addEventListener('click', toggleTelemetryPanel);
+  }
+
+  // Atajos coloreados superiores junto al menú hamburguesa
+  const btnNavSources = document.getElementById('btn-nav-sources');
+  if (btnNavSources) btnNavSources.addEventListener('click', openSourcesPanel);
+  const btnNavToc = document.getElementById('btn-nav-toc');
+  if (btnNavToc) btnNavToc.addEventListener('click', openTocPanel);
+  const btnNavTele = document.getElementById('btn-nav-tele');
+  if (btnNavTele) btnNavTele.addEventListener('click', toggleTelemetryPanel);
 
   // Tema
   document.getElementById('btn-theme').addEventListener('click', () => {
@@ -3172,15 +3219,27 @@ function getDocumentHeadings() {
     const text = el.textContent.trim();
     if (!text) return;
     const level = parseInt(el.tagName.replace('H', ''), 10);
-    const id = el.id || `doc-heading-${index + 1}`;
+    const id = `doc-heading-${index + 1}`;
     el.id = id;
+    el.setAttribute('data-heading-idx', String(index));
 
-    // Calcular página simulada (1056px por página)
+    // Calcular página real (1056px por página)
     const elOffset = el.offsetTop;
-    const pageNum = Math.max(1, Math.floor(elOffset / 1056) + 1);
+    const pageNum = Math.max(1, Math.floor(elOffset / PAGE_HEIGHT) + 1);
+
+    // Buscar el índice de carácter en Quill para selección directa
+    let charIndex = null;
+    try {
+      const blot = Quill.find(el);
+      if (blot && App.quill) {
+        charIndex = App.quill.getIndex(blot);
+      }
+    } catch (e) {}
 
     headings.push({
       id,
+      index,
+      charIndex,
       level,
       text,
       pageNum,
@@ -3207,7 +3266,7 @@ function updateTableOfContents() {
   let html = '';
   headings.forEach(h => {
     html += `
-      <div class="toc-item toc-item-h${h.level}" data-heading-id="${h.id}" title="${escapeHtml(h.text)} (Pág. ${h.pageNum})">
+      <div class="toc-item toc-item-h${h.level}" data-heading-id="${h.id}" data-heading-idx="${h.index}" data-char-idx="${h.charIndex !== null ? h.charIndex : ''}" title="${escapeHtml(h.text)} (Pág. ${h.pageNum})">
         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(h.text)}</span>
         <span class="toc-badge">P.${h.pageNum}</span>
       </div>
@@ -3216,21 +3275,29 @@ function updateTableOfContents() {
   tocList.innerHTML = html;
 
   tocList.querySelectorAll('.toc-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const hId = item.getAttribute('data-heading-id');
-      const targetEl = document.getElementById(hId);
-      if (targetEl) {
-        const editorArea = document.getElementById('editor-area');
-        if (editorArea) {
-          const sheet = document.getElementById('document-sheet');
-          const targetTop = targetEl.offsetTop + (sheet ? sheet.offsetTop : 0) - 20;
-          editorArea.scrollTo({ top: targetTop, behavior: 'smooth' });
-        }
-        targetEl.classList.remove('heading-nav-pulse');
-        void targetEl.offsetWidth; // forzar reflow
-        targetEl.classList.add('heading-nav-pulse');
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-        // En pantallas móviles (Android/iOS <= 900px), cerrar el panel para mostrar el documento
+      const idx = parseInt(item.getAttribute('data-heading-idx'), 10);
+      const rawCharIdx = item.getAttribute('data-char-idx');
+      const charIdx = rawCharIdx !== '' ? parseInt(rawCharIdx, 10) : null;
+      const editor = document.querySelector('#quill-editor .ql-editor');
+      let targetEl = null;
+
+      if (editor) {
+        const elements = editor.querySelectorAll('h1, h2, h3, h4, h5');
+        if (elements && elements[idx]) {
+          targetEl = elements[idx];
+        }
+      }
+      if (!targetEl) {
+        const hId = item.getAttribute('data-heading-id');
+        targetEl = document.getElementById(hId);
+      }
+
+      if (targetEl) {
+        // 1. Cerrar panel móvil si estamos en pantalla pequeña (<= 900px)
         if (window.innerWidth <= 900) {
           const sb = document.getElementById('sidebar-sources');
           if (sb) {
@@ -3239,6 +3306,38 @@ function updateTableOfContents() {
             updatePanelBackdrop();
           }
         }
+
+        // 2. Colocar cursor en Quill en el título si se conoce el charIndex
+        if (charIdx !== null && !isNaN(charIdx) && App.quill) {
+          try {
+            App.quill.setSelection(charIdx, 0, 'user');
+          } catch (err) {}
+        }
+
+        // 3. Ejecutar scroll nativo garantizado y centrado
+        const executeScroll = () => {
+          try {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch (err) {
+            targetEl.scrollIntoView(true);
+          }
+
+          const editorArea = document.getElementById('editor-area');
+          if (editorArea) {
+            const rect = targetEl.getBoundingClientRect();
+            const areaRect = editorArea.getBoundingClientRect();
+            const diff = (rect.top - areaRect.top) - (areaRect.height / 3);
+            editorArea.scrollBy({ top: diff, behavior: 'smooth' });
+          }
+
+          targetEl.classList.remove('heading-nav-pulse');
+          void targetEl.offsetWidth; // forzar reflow
+          targetEl.classList.add('heading-nav-pulse');
+        };
+
+        executeScroll();
+        // Segundo pase tras 100ms para asegurar que el reflow del cierre del panel no aborte el scroll
+        setTimeout(executeScroll, 100);
       }
     });
   });
@@ -3346,25 +3445,24 @@ const PAGE_HEIGHT = 1056; // Altura estándar de página Carta/A4 a 96dpi
 function updatePageMetrics(fromScroll = false) {
   const editorArea = document.getElementById('editor-area');
   const sheet = document.getElementById('document-sheet');
-  const indicator = document.getElementById('sb-page-indicator');
+  const editor = document.querySelector('#quill-editor .ql-editor');
   if (!editorArea || !sheet) return;
 
-  const sheetHeight = Math.max(sheet.scrollHeight, 1056);
-  const totalPages = Math.max(1, Math.ceil(sheetHeight / PAGE_HEIGHT));
+  // Medir altura real del contenido editado y calcular páginas completas necesarias
+  const contentHeight = editor ? Math.max(editor.scrollHeight, editor.offsetHeight, 600) : 600;
+  const totalPages = Math.max(1, Math.ceil(contentHeight / PAGE_HEIGHT));
 
-  const scrollTop = editorArea.scrollTop;
-  const viewMiddle = scrollTop + (editorArea.clientHeight / 3);
-  const currentPage = Math.min(totalPages, Math.max(1, Math.floor(viewMiddle / PAGE_HEIGHT) + 1));
-
-  if (indicator) {
-    indicator.textContent = `Pág. ${currentPage} de ${totalPages}`;
-  }
+  // Asegurar que el lienzo del documento tenga la altura suficiente para contener todas las páginas
+  sheet.style.minHeight = `${totalPages * PAGE_HEIGHT}px`;
 
   // Actualizar líneas visibles de corte de página
   updateVisiblePageBreaks(totalPages);
 
-  // Si proviene de interacción con scroll o se requiere tooltip
+  // Si proviene de interacción con scroll o se requiere tooltip flotante
   if (fromScroll) {
+    const scrollTop = editorArea.scrollTop;
+    const viewMiddle = scrollTop + (editorArea.clientHeight / 3);
+    const currentPage = Math.min(totalPages, Math.max(1, Math.floor(viewMiddle / PAGE_HEIGHT) + 1));
     showScrollPageTooltip(currentPage, totalPages);
   }
 }
@@ -3381,7 +3479,7 @@ function updateVisiblePageBreaks(totalPages) {
     const breakEl = document.createElement('div');
     breakEl.className = 'page-break-line';
     breakEl.style.top = `${(p - 1) * PAGE_HEIGHT}px`;
-    breakEl.innerHTML = `<span class="page-break-badge">Página ${p}</span>`;
+    breakEl.innerHTML = `<span class="page-break-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Fin de Página ${p - 1} &nbsp;·&nbsp; Página ${p}</span>`;
     sheet.appendChild(breakEl);
   }
 }
@@ -3418,31 +3516,54 @@ function updateCursorPosition() {
   }
 
   const range = App.quill.getSelection();
-  if (!range) {
-    return;
-  }
+  if (!range) return;
 
   try {
+    const editor = document.querySelector('#quill-editor .ql-editor');
+    if (!editor) return;
+
+    // 1. Obtener la línea/bloque de Quill donde se ubica el cursor
+    const [currentBlot] = App.quill.getLine(range.index);
+    const currentDom = currentBlot ? currentBlot.domNode : null;
+
+    // 2. Obtener la posición vertical exacta mediante bounds o DOM
     const bounds = App.quill.getBounds(range.index);
-    if (!bounds) {
-      indicator.textContent = 'Línea 1 de Pág. 1';
-      return;
+    const cursorTop = bounds ? Math.max(0, bounds.top) : (currentDom ? currentDom.offsetTop : 0);
+
+    // 3. Determinar la página actual con base en PAGE_HEIGHT (1056px)
+    const cursorPage = Math.max(1, Math.floor(cursorTop / PAGE_HEIGHT) + 1);
+
+    // 4. Calcular el número de línea exacto dentro de la página actual
+    const pageTop = (cursorPage - 1) * PAGE_HEIGHT;
+    const pageBottom = cursorPage * PAGE_HEIGHT;
+
+    let lineInPage = 1;
+    const blocks = Array.from(editor.querySelectorAll('p, h1, h2, h3, h4, h5, li, blockquote, pre, tr'));
+
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      const bTop = b.offsetTop;
+      const bHeight = b.offsetHeight || 28;
+
+      // Si el bloque finaliza antes del inicio de esta página, saltarlo
+      if ((bTop + bHeight) <= pageTop) continue;
+
+      // Si el bloque comienza en la página siguiente, terminar conteo
+      if (bTop >= pageBottom) break;
+
+      // Si alcanzamos el bloque donde está el cursor
+      if (b === currentDom || b.contains(currentDom)) {
+        // En caso de que el párrafo tenga múltiples líneas envueltas (wrapped text)
+        const innerOffset = Math.max(0, cursorTop - bTop);
+        const innerLines = Math.floor(innerOffset / 28);
+        lineInPage += innerLines;
+        break;
+      }
+
+      // Estimar cuántas líneas visuales ocupa este bloque previo en la página
+      const blockLineCount = Math.max(1, Math.round(bHeight / 28));
+      lineInPage += blockLineCount;
     }
-
-    // Cada página virtual tiene una altura de PAGE_HEIGHT = 1056px
-    const cursorTop = Math.max(0, bounds.top);
-    const cursorPage = Math.floor(cursorTop / PAGE_HEIGHT) + 1;
-
-    // Calcular el offset dentro de la página actual
-    const offsetInPage = Math.max(0, cursorTop - ((cursorPage - 1) * PAGE_HEIGHT));
-
-    // Descontar el padding superior de página (aprox 48px)
-    const pageTopPadding = 48;
-    const effectiveOffset = Math.max(0, offsetInPage - pageTopPadding);
-
-    // Altura de línea estándar calculada o detectada
-    const lineHeight = (bounds.height && bounds.height > 12 && bounds.height < 100) ? bounds.height : 28;
-    const lineInPage = Math.floor(effectiveOffset / lineHeight) + 1;
 
     indicator.textContent = `Línea ${lineInPage} de Pág. ${cursorPage}`;
   } catch (err) {

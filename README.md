@@ -317,14 +317,11 @@ Para garantizar la mejor experiencia tanto en computadoras de escritorio como en
   - El título de la barra superior se mantiene limpio y enfocado exclusivamente en el logo y el título editable del documento del estudiante.
 
 - 📱 **En teléfonos móviles y pantallas estrechas ($\le$ 768px):**
-  - **Barra superior despejada:** Oculta los botones de solo icono que resultaban crípticos o difíciles de interpretar en pantallas de celular. Muestra únicamente el isotipo, el campo del título del documento, el punto de estado de guardado y un **botón de Menú Hamburguesa** (☰).
-  - **Drawer Lateral Desplegable con texto explicativo:** Al pulsar el botón hamburguesa, se despliega un panel lateral suave con todas las funciones organizadas en categorías claras y acompañadas de nombres, iconos descriptivos y leyendas en español:
-    - 📊 **Estado de Guardado y Avance:** Muestra el número de palabras escritas y si el archivo está guardado localmente en tiempo real.
-    - 👁️ **Vistas y Paneles:** Botones para abrir el *Panel de Fuentes científicas* y el *Panel de Actividad y Salud*, con indicadores de estado ("Abierto" / "Oculto").
-    - ⚙️ **Preferencias:** Controles para alternar el *Tema visual* (Modo Claro / Modo Oscuro) y los *Efectos de sonido* de gamificación (Activado / Silenciado).
-    - 💾 **Archivo y Guardado:** Opciones para *Descargar copia (.json)* y *Abrir archivo .json existente* desde el explorador del dispositivo.
-    - 📄 **Exportar Manuscrito:** Enlaces para generar *PDF*, descargar en *Word (.docx)* o exportar para *Zotero (.ris)*.
-    - 👨‍🏫 **Docencia:** Acceso directo para saltar al *Panel Docente* (`dashboard.html`).
+  - **Accesos directos coloreados en la cabecera:** Junto al botón de menú hamburguesa se ubican 3 accesos directos táctiles y coloreados de forma intuitiva:
+    - 🟢 **Fuentes bibliográficas** (Verde Esmeralda): Abre directamente el panel lateral con la lista de referencias científicas.
+    - 🔵 **Índice / Esquema (TOC)** (Celeste): Abre directamente la estructura jerárquica de contenidos para navegación rápida.
+    - 🔴 **Actividad y Salud** (Rosa / Coral): Despliega el panel de telemetría biométrica y pausas activas.
+  - **Botón de Menú Hamburguesa (☰):** Al pulsar el menú hamburguesa se despliega un panel lateral suave con todas las funciones organizadas en categorías claras (guardado, preferencias, exportaciones a PDF/Word/RIS y acceso a docencia).
   - **Paneles flotantes tipo overlay:** Los paneles de fuentes y telemetría se abren como tarjetas flotantes superpuestas para no comprimir ni desconfigurar el ancho de la hoja de redacción del documento.
   - **Barra de formato con scroll táctil:** La barra de herramientas de negrita, cursiva, listas y encabezados se desplaza horizontalmente con suavidad táctil sin quebrar en múltiples filas.
 
@@ -353,8 +350,8 @@ En la fila de herramientas de formato se integraron 3 botones de sangría:
 #### 3. Tabla de Contenidos (TOC) Navegable, Auto-actualizable e Insertable
 * **Pestañas en panel lateral:** El panel izquierdo incluye pestañas de acceso táctil e instantáneo para alternar entre **"Fuentes"** e **"Índice / Contenido"**.
 * **Auto-actualizable:** Al escribir o cambiar títulos (H1-H5) en el documento, el índice lateral se regenera en tiempo real sin recargar la página.
-* **Navegable y optimizado para móviles:** Al hacer clic o tocar sobre cualquier título en el panel lateral, el visor se traslada suavemente hasta la sección elegida, resalta el encabezado con una animación visual de pulso y, en teléfonos móviles (Android / iOS), pliega automáticamente el panel para permitir continuar la lectura y edición cómodamente.
-* **Insertable en el manuscrito:** Con el botón **"Insertar"** (en el panel o en la barra de herramientas), se inserta un bloque de *Índice General* en la posición del cursor, con sangrías proporcionales al nivel, líneas de puntos guía (*dotted leaders*) y el cálculo estimado del número de página de cada sección.
+* **Navegación precisa y fluida:** Al pulsar cualquier sección en el TOC, el visor realiza un scroll suave centrado directamente en el encabezado, coloca el cursor de redacción en la posición correspondiente y resalta el título con una animación visual de pulso. En móviles ($\le 900\text{px}$), el panel se retira de inmediato para mostrar el contenido.
+* **Botón Insertar índice dentro del panel:** El comando para plasmar el índice en el manuscrito se encuentra integrado exclusivamente dentro del panel del TOC (`Insertar índice`), dejando la barra de herramientas principal limpia y despejada. Genera un bloque de *Índice General* en la posición del cursor con líneas de puntos guía (*dotted leaders*) y la página calculada.
 
 #### 4. Bibliografía Académica Insertable
 * Al pulsar el botón **"Bibliografía"** en la barra superior, el editor toma todas las fuentes registradas en el proyecto y genera automáticamente la sección de referencias al final del documento.
@@ -368,10 +365,10 @@ En la fila de herramientas de formato se integraron 3 botones de sangría:
 * **Wrapping condicional:** Si la suma de anchos de las columnas excede los márgenes de la hoja de trabajo, el sistema activa automáticamente el salto de línea interno en las celdas (`table-wrapped`), evitando que la tabla se desborde fuera de la página.
 * **Controles directos:** Cada tabla cuenta con una barra de herramientas superior que permite añadir filas (`+ Fila`), columnas (`+ Columna`), eliminarlas (`- Fila`, `- Columna`) o suprimir la tabla entera.
 
-#### 6. Paginación Visible, Posición del Cursor en Barra de Estado y Scroll Tooltip
-* **Corte de página visible:** La hoja de trabajo traza sutiles líneas divisorias horizontales discontinuas cada 1056 px (equivalente a una página tamaño Carta a escala 96 dpi) acompañadas de etiquetas identificadoras ("Página 2", "Página 3", etc.).
-* **Páginas totales:** La barra inferior muestra el indicador dinámico **`Pág. X de Y`** según la posición visible del documento.
-* **Ubicación exacta del cursor en tiempo real:** Se eliminó la etiqueta estática de estilo de cita y se reemplazó por el indicador de precisión **`Línea [X] de Pág. [Y]`**, informando al redactor exactamente en qué línea y página se encuentra su cursor al escribir o hacer clic.
+#### 6. División de Página Nítida, Conteo de Líneas Exacto y Barra de Estado
+* **Franja divisoria de página visible:** Para que el corte entre páginas sea inequívoco y visible, el lienzo del documento traza una franja divisoria tridimensional de 38 px con el distintivo `📄 Fin de Página X · Página Y` cada 1056 px (equivalente al tamaño Carta con márgenes normativos). El documento ya no parece una hoja continua infinita, sino páginas reales separadas.
+* **Conteo exacto de líneas sin reinicios erráticos:** El sistema calcula las líneas reales por bloques y párrafos dentro de cada página. A medida que el redactor avanza, las líneas se contabilizan de forma consistente (Línea 1, 2, 3...) y únicamente pasan a la siguiente página al cruzar la franja divisoria.
+* **Barra de estado despejada:** Siguiendo la preferencia de diseño, se eliminó el indicador redundante de página suelta, manteniendo exclusivamente el indicador unificado de precisión **`Línea [X] de Pág. [Y]`** (ej. *Línea 12 de Pág. 2*).
 * **Tooltip flotante en la barra de desplazamiento:** Al arrastrar la barra de scroll o desplazarse con la rueda del ratón/táctil, aparece un distintivo flotante junto al cursor de desplazamiento que indica la página actual en tiempo real y desaparece automáticamente al soltar.
 
 ---
