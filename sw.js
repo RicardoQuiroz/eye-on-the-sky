@@ -5,7 +5,7 @@
  * se recarga o se pierde la conexión a internet.
  */
 
-const CACHE_NAME = 'eots-offline-v1.3';
+const CACHE_NAME = 'eots-offline-v1.4';
 
 const STATIC_ASSETS = [
   './',
@@ -14,7 +14,9 @@ const STATIC_ASSETS = [
   'styles.css',
   'styles.css?v=1.1',
   'styles.css?v=1.2',
+  'styles.css?v=1.3',
   'editor.js',
+  'editor.js?v=1.3',
   'dashboard.js',
   'manifest.json',
   'icon.svg',
@@ -116,7 +118,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Recursos estáticos (CSS, JS, Fuentes, Imágenes, Sonidos, CDNs)
+  // 2. Scripts y estilos locales de la propia aplicación: Network-First con fallback a caché
+  // Esto garantiza que en teléfonos Android y navegadores móviles los cambios se reflejen
+  // de inmediato al recargar cuando hay conexión, sin quedar atrapados en un caché obsoleto.
+  const isSameOriginCode = (url.origin === self.location.origin) &&
+    (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'));
+
+  if (isSameOriginCode) {
+    event.respondWith(
+      fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(req);
+          return cached || new Response('', { status: 408, statusText: 'Offline and asset not cached' });
+        })
+    );
+    return;
+  }
+
+  // 3. Recursos estáticos externos y multimedia (Fuentes, Sonidos, CDNs, Iconos):
   // Estrategia: Cache-First con actualización silenciosa en segundo plano (Stale-While-Revalidate)
   event.respondWith(
     caches.match(req).then((cachedResponse) => {

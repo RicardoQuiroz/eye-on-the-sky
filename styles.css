@@ -36,8 +36,8 @@
 
   /* Colores de encabezados */
   --heading-h1: #1a1d23;
-  --heading-h2: #1b3a6b;
-  --heading-h3: #2196F3;
+  --heading-h2: #2196F3;
+  --heading-h3: #0288d1;
   --heading-h4: #7CB342;
   --heading-h5: #9C27B0;
 
@@ -620,8 +620,9 @@ body {
 }
 
 .modal-overlay.open {
-  opacity: 1;
-  pointer-events: all;
+  opacity: 1 !important;
+  pointer-events: all !important;
+  visibility: visible !important;
 }
 
 .modal {
@@ -1553,20 +1554,27 @@ body {
    NUEVAS FUNCIONALIDADES: TOC, TABLAS, SANGRÍAS, PÁGINAS
    ============================================================ */
 
-/* ---- Colores de encabezados en el selector de Quill ---- */
+/* ---- Colores y etiquetas de encabezados en el selector de Quill ---- */
+.ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item::before {
+  content: 'Normal' !important;
+}
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value="1"]::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="1"]::before {
+  content: 'Título 1' !important;
   color: var(--heading-h1) !important;
   font-weight: 700;
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value="2"]::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="2"]::before {
+  content: 'Título 2' !important;
   color: var(--heading-h2) !important;
   font-weight: 600;
   padding-left: 6px;
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value="3"]::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="3"]::before {
+  content: 'Título 3' !important;
   color: var(--heading-h3) !important;
   font-weight: 600;
   font-style: italic;
@@ -1574,11 +1582,13 @@ body {
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value="4"]::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="4"]::before {
+  content: 'Título 4' !important;
   color: var(--heading-h4) !important;
   font-weight: 600;
 }
 .ql-snow .ql-picker.ql-header .ql-picker-label[data-value="5"]::before,
 .ql-snow .ql-picker.ql-header .ql-picker-item[data-value="5"]::before {
+  content: 'Título 5' !important;
   color: var(--heading-h5) !important;
   font-weight: 600;
 }
@@ -1686,6 +1696,8 @@ body {
   font-size: 0.84rem;
   font-weight: 500;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transition: all var(--transition);
 }
 

@@ -337,12 +337,12 @@ Con el fin de ofrecer una experiencia completa de procesador de textos académic
 #### 1. Estilos Tipográficos Normativos (H1 a H5)
 Los niveles de encabezado aplican automáticamente un código cromático y estructural para jerarquizar el manuscrito:
 * **H1 (Título principal):** Color negro (`#1a1d23` en tema claro, adaptado en tema oscuro), sin sangría.
-* **H2 (Sección):** Color azul marino (`#1b3a6b`), sangría de 4 espacios (`padding-left: 4ch`).
+* **H2 (Sección):** Color celeste (`#2196F3` en tema claro, `#64b5f6` en tema oscuro), sangría de 4 espacios (`padding-left: 4ch`).
 * **H3 (Subsección):** Color celeste (`#2196F3`), sangría de 8 espacios (`padding-left: 8ch`) y estilo *cursiva*.
 * **H4 (Sub-apartado):** Color verde lechuga (`#7CB342`), sin sangría.
 * **H5 (Nivel de detalle):** Color lila (`#9C27B0`), sin sangría.
 * **Párrafos de texto regular:** Sangría de primera línea de 4 espacios (`text-indent: 4ch`).
-* El menú desplegable de títulos en la barra de herramientas previsualiza los colores y sangrías reales de cada nivel.
+* El menú desplegable de títulos en la barra de herramientas previsualiza los nombres en español ("Normal", "Título 1" a "Título 5") junto a sus colores y sangrías reales.
 
 #### 2. Herramientas de Sangría Triple (Izquierda, Derecha y Ambas)
 En la fila de herramientas de formato se integraron 3 botones de sangría:
@@ -351,9 +351,9 @@ En la fila de herramientas de formato se integraron 3 botones de sangría:
 * **Sangría a Ambos Lados:** Aplica márgenes simétricos a izquierda y derecha, indispensable para **citas textuales en bloque** (citas de más de 40 palabras según las normas APA y Chicago). Al presionar el botón sucesivamente, conmuta entre los niveles 1, 2, 3 o elimina la sangría.
 
 #### 3. Tabla de Contenidos (TOC) Navegable, Auto-actualizable e Insertable
-* **Pestaña en panel lateral:** El panel izquierdo incluye ahora pestañas para alternar entre **"Fuentes"** e **"Índice / Contenido"**.
+* **Pestañas en panel lateral:** El panel izquierdo incluye pestañas de acceso táctil e instantáneo para alternar entre **"Fuentes"** e **"Índice / Contenido"**.
 * **Auto-actualizable:** Al escribir o cambiar títulos (H1-H5) en el documento, el índice lateral se regenera en tiempo real sin recargar la página.
-* **Navegable:** Al hacer clic sobre cualquier título en el panel lateral, el visor se traslada suavemente hasta la sección elegida y resalta el encabezado con una animación visual de pulso.
+* **Navegable y optimizado para móviles:** Al hacer clic o tocar sobre cualquier título en el panel lateral, el visor se traslada suavemente hasta la sección elegida, resalta el encabezado con una animación visual de pulso y, en teléfonos móviles (Android / iOS), pliega automáticamente el panel para permitir continuar la lectura y edición cómodamente.
 * **Insertable en el manuscrito:** Con el botón **"Insertar"** (en el panel o en la barra de herramientas), se inserta un bloque de *Índice General* en la posición del cursor, con sangrías proporcionales al nivel, líneas de puntos guía (*dotted leaders*) y el cálculo estimado del número de página de cada sección.
 
 #### 4. Bibliografía Académica Insertable
@@ -363,14 +363,15 @@ En la fila de herramientas de formato se integraron 3 botones de sangría:
 * **Estilos normativos:** Da formato a cada ficha según el estilo bibliográfico activo (Chicago nota completa, APA 7.ª edición o MLA).
 
 #### 5. Herramienta de Tablas con Autoajuste y Wrapping Condicional Inteligente
-* **Inserción personalizada:** Al pulsar **"Tabla"**, un diálogo modal permite indicar el número de filas (1 a 25), columnas (1 a 10) y si se desea incluir fila de encabezados resaltada.
+* **Inserción táctil y modal:** Al pulsar el botón **"Tabla"** (optimizado con soporte táctil universal e interactivo para Android y PC), un diálogo modal permite indicar el número de filas (1 a 25), columnas (1 a 10) y si se desea incluir fila de encabezados resaltada.
 * **Autoajuste de columnas:** Cada columna ajusta automáticamente su ancho al texto de la celda más larga (`white-space: nowrap`), asegurando un aspecto ordenado y compacto.
 * **Wrapping condicional:** Si la suma de anchos de las columnas excede los márgenes de la hoja de trabajo, el sistema activa automáticamente el salto de línea interno en las celdas (`table-wrapped`), evitando que la tabla se desborde fuera de la página.
 * **Controles directos:** Cada tabla cuenta con una barra de herramientas superior que permite añadir filas (`+ Fila`), columnas (`+ Columna`), eliminarlas (`- Fila`, `- Columna`) o suprimir la tabla entera.
 
-#### 6. Paginación Visible, Indicador en Barra de Estado y Scroll Tooltip
+#### 6. Paginación Visible, Posición del Cursor en Barra de Estado y Scroll Tooltip
 * **Corte de página visible:** La hoja de trabajo traza sutiles líneas divisorias horizontales discontinuas cada 1056 px (equivalente a una página tamaño Carta a escala 96 dpi) acompañadas de etiquetas identificadoras ("Página 2", "Página 3", etc.).
-* **Número de página en la barra de estado:** La barra inferior reemplaza el nombre del proyecto por el indicador dinámico **`Pág. X de Y`**, actualizándose conforme se redacta o se navega.
+* **Páginas totales:** La barra inferior muestra el indicador dinámico **`Pág. X de Y`** según la posición visible del documento.
+* **Ubicación exacta del cursor en tiempo real:** Se eliminó la etiqueta estática de estilo de cita y se reemplazó por el indicador de precisión **`Línea [X] de Pág. [Y]`**, informando al redactor exactamente en qué línea y página se encuentra su cursor al escribir o hacer clic.
 * **Tooltip flotante en la barra de desplazamiento:** Al arrastrar la barra de scroll o desplazarse con la rueda del ratón/táctil, aparece un distintivo flotante junto al cursor de desplazamiento que indica la página actual en tiempo real y desaparece automáticamente al soltar.
 
 ---

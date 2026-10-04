@@ -532,9 +532,10 @@ function initQuill() {
     updateWordCount(currentWC);
     updateTelemetryUI();
 
-    // Actualizar TOC, cálculo de páginas y tablas
+    // Actualizar TOC, cálculo de páginas, posición de cursor y tablas
     scheduleUpdateTOC();
     updatePageMetrics();
+    updateCursorPosition();
     adjustAllTablesWrapping();
 
     // Bug fix: limpiar formato 'background' activo si el usuario está escribiendo
@@ -561,6 +562,11 @@ function initQuill() {
     }
   });
 
+  // Seguimiento de posición de cursor en tiempo real (Línea X de Pág. Y)
+  App.quill.on('selection-change', (range, oldRange, source) => {
+    updateCursorPosition();
+  });
+
   // Activar corrector ortográfico nativo del navegador en español y eventos biométricos
   const editorEl = document.querySelector('#quill-editor .ql-editor');
   if (editorEl) {
@@ -569,10 +575,14 @@ function initQuill() {
     editorEl.setAttribute('autocorrect', 'on');
     editorEl.addEventListener('paste', handlePasteEvent);
     editorEl.addEventListener('keydown', handleKeystrokeEvent);
-    editorEl.addEventListener('keyup', handleKeyUpEvent);
+    editorEl.addEventListener('keyup', (e) => {
+      handleKeyUpEvent(e);
+      updateCursorPosition();
+    });
     editorEl.addEventListener('input', (e) => {
       scheduleUpdateTOC();
       updatePageMetrics();
+      updateCursorPosition();
       const table = e.target.closest('.academic-table');
       if (table) {
         adjustTableWrapping(table);
@@ -580,7 +590,10 @@ function initQuill() {
         updateSaveStatus('unsaved');
       }
     });
-    editorEl.addEventListener('click', handleTableActionClick);
+    editorEl.addEventListener('click', (e) => {
+      handleTableActionClick(e);
+      updateCursorPosition();
+    });
   }
 }
 
@@ -2108,8 +2121,20 @@ function typeLabel(type) {
   return map[type] || type;
 }
 
-function openModal(id)  { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id)  {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('open');
+  }
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.remove('open');
+  }
+}
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
@@ -2881,25 +2906,53 @@ function importBibtex() {
    ================================================================ */
 
 // ---- Pestañas del Sidebar Izquierdo ----
-function initSidebarTabs() {
+function switchSidebarTab(tabName) {
   const tabSources = document.getElementById('tab-btn-sources');
   const tabToc = document.getElementById('tab-btn-toc');
   const viewSources = document.getElementById('view-sources');
   const viewToc = document.getElementById('view-toc');
 
-  if (tabSources && tabToc && viewSources && viewToc) {
-    tabSources.addEventListener('click', () => {
-      tabSources.classList.add('active');
-      tabToc.classList.remove('active');
-      viewSources.classList.remove('hidden');
-      viewToc.classList.add('hidden');
-    });
-    tabToc.addEventListener('click', () => {
-      tabToc.classList.add('active');
-      tabSources.classList.remove('active');
-      viewToc.classList.remove('hidden');
+  if (tabName === 'toc') {
+    if (tabToc) tabToc.classList.add('active');
+    if (tabSources) tabSources.classList.remove('active');
+    if (viewSources) {
       viewSources.classList.add('hidden');
-      updateTableOfContents();
+      viewSources.style.display = 'none';
+    }
+    if (viewToc) {
+      viewToc.classList.remove('hidden');
+      viewToc.style.display = 'flex';
+    }
+    updateTableOfContents();
+  } else {
+    if (tabSources) tabSources.classList.add('active');
+    if (tabToc) tabToc.classList.remove('active');
+    if (viewToc) {
+      viewToc.classList.add('hidden');
+      viewToc.style.display = 'none';
+    }
+    if (viewSources) {
+      viewSources.classList.remove('hidden');
+      viewSources.style.display = 'flex';
+    }
+  }
+}
+window.switchSidebarTab = switchSidebarTab;
+
+function initSidebarTabs() {
+  const tabSources = document.getElementById('tab-btn-sources');
+  const tabToc = document.getElementById('tab-btn-toc');
+
+  if (tabSources) {
+    tabSources.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchSidebarTab('sources');
+    });
+  }
+  if (tabToc) {
+    tabToc.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchSidebarTab('toc');
     });
   }
 }
@@ -2945,10 +2998,12 @@ function applyIndentBoth() {
 function openTableModal() {
   openModal('modal-table-overlay');
 }
+window.openTableModal = openTableModal;
 
 function closeTableModal() {
   closeModal('modal-table-overlay');
 }
+window.closeTableModal = closeTableModal;
 
 function insertTableAtCursor() {
   const rowsInput = document.getElementById('table-input-rows');
@@ -3174,10 +3229,21 @@ function updateTableOfContents() {
         targetEl.classList.remove('heading-nav-pulse');
         void targetEl.offsetWidth; // forzar reflow
         targetEl.classList.add('heading-nav-pulse');
+
+        // En pantallas móviles (Android/iOS <= 900px), cerrar el panel para mostrar el documento
+        if (window.innerWidth <= 900) {
+          const sb = document.getElementById('sidebar-sources');
+          if (sb) {
+            App.ui.sourcesPanelOpen = false;
+            sb.classList.add('collapsed');
+            updatePanelBackdrop();
+          }
+        }
       }
     });
   });
 }
+window.updateTableOfContents = updateTableOfContents;
 
 function insertTableOfContentsIntoDoc() {
   const headings = getDocumentHeadings();
@@ -3340,4 +3406,49 @@ function showScrollPageTooltip(currentPage, totalPages) {
     tooltip.classList.remove('visible');
   }, 1200);
 }
+
+// ---- Indicador de Posición del Cursor en Barra de Estado (Línea X de Pág. Y) ----
+function updateCursorPosition() {
+  const indicator = document.getElementById('sb-cursor-pos-indicator');
+  if (!indicator) return;
+
+  if (!App.quill) {
+    indicator.textContent = 'Línea 1 de Pág. 1';
+    return;
+  }
+
+  const range = App.quill.getSelection();
+  if (!range) {
+    return;
+  }
+
+  try {
+    const bounds = App.quill.getBounds(range.index);
+    if (!bounds) {
+      indicator.textContent = 'Línea 1 de Pág. 1';
+      return;
+    }
+
+    // Cada página virtual tiene una altura de PAGE_HEIGHT = 1056px
+    const cursorTop = Math.max(0, bounds.top);
+    const cursorPage = Math.floor(cursorTop / PAGE_HEIGHT) + 1;
+
+    // Calcular el offset dentro de la página actual
+    const offsetInPage = Math.max(0, cursorTop - ((cursorPage - 1) * PAGE_HEIGHT));
+
+    // Descontar el padding superior de página (aprox 48px)
+    const pageTopPadding = 48;
+    const effectiveOffset = Math.max(0, offsetInPage - pageTopPadding);
+
+    // Altura de línea estándar calculada o detectada
+    const lineHeight = (bounds.height && bounds.height > 12 && bounds.height < 100) ? bounds.height : 28;
+    const lineInPage = Math.floor(effectiveOffset / lineHeight) + 1;
+
+    indicator.textContent = `Línea ${lineInPage} de Pág. ${cursorPage}`;
+  } catch (err) {
+    console.warn('Error calculating cursor position:', err);
+  }
+}
+window.updateCursorPosition = updateCursorPosition;
+
 
