@@ -5,7 +5,7 @@
  * se recarga o se pierde la conexión a internet.
  */
 
-const CACHE_NAME = 'eots-offline-v1.2';
+const CACHE_NAME = 'eots-offline-v1.3';
 
 const STATIC_ASSETS = [
   './',
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   'dashboard.html',
   'styles.css',
   'styles.css?v=1.1',
+  'styles.css?v=1.2',
   'editor.js',
   'dashboard.js',
   'manifest.json',

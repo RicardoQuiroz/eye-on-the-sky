@@ -34,6 +34,13 @@
   --success:       #10b981;
   --success-light: #d1fae5;
 
+  /* Colores de encabezados */
+  --heading-h1: #1a1d23;
+  --heading-h2: #1b3a6b;
+  --heading-h3: #2196F3;
+  --heading-h4: #7CB342;
+  --heading-h5: #9C27B0;
+
   /* Editor de documento */
   --doc-bg:        #ffffff;
   --doc-text:      #1a1d23;
@@ -85,6 +92,13 @@
   --warning-light: #2d2210;
   --success:       #34d399;
   --success-light: #0d2920;
+
+  /* Colores de encabezados (oscuro) */
+  --heading-h1: #e8eaf0;
+  --heading-h2: #5b9bd5;
+  --heading-h3: #64b5f6;
+  --heading-h4: #aed581;
+  --heading-h5: #ce93d8;
 
   --doc-bg:        #1e2130;
   --doc-text:      #dde1ec;
@@ -311,15 +325,23 @@ body {
   background: var(--bg-app);
 }
 
-/* Hoja de documento */
+/* Hoja de documento (con división de página visible cada ~11" a 96dpi) */
 #document-sheet {
   width: 100%;
   max-width: var(--doc-max-width);
-  background: var(--doc-bg);
+  background-color: var(--doc-bg);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 1055px,
+    var(--border) 1055px,
+    var(--border) 1056px
+  );
   border-radius: 4px;
   box-shadow: var(--shadow-md);
   min-height: 600px;
-  transition: background var(--transition);
+  position: relative;
+  transition: background-color var(--transition);
 }
 
 /* Quill editor override */
@@ -337,12 +359,12 @@ body {
 .ql-container { border: none !important; }
 .ql-editor { padding: 0 !important; }
 
-.ql-editor h1 { font-size: 1.6rem; font-weight: 700; margin: 1.4em 0 0.6em; }
-.ql-editor h2 { font-size: 1.25rem; font-weight: 600; margin: 1.2em 0 0.5em; }
-.ql-editor h3 { font-size: 1.05rem; font-weight: 600; margin: 1em 0 0.4em; }
-.ql-editor h4 { font-size: 0.95rem; font-weight: 600; margin: 0.9em 0 0.35em; }
-.ql-editor h5 { font-size: 0.85rem; font-weight: 600; margin: 0.8em 0 0.3em; }
-.ql-editor p  { margin: 0 0 0.9em; }
+.ql-editor h1 { font-size: 1.6rem; font-weight: 700; margin: 1.4em 0 0.6em; color: var(--heading-h1); }
+.ql-editor h2 { font-size: 1.25rem; font-weight: 600; margin: 1.2em 0 0.5em; color: var(--heading-h2); padding-left: 4ch; }
+.ql-editor h3 { font-size: 1.05rem; font-weight: 600; margin: 1em 0 0.4em; color: var(--heading-h3); padding-left: 8ch; font-style: italic; }
+.ql-editor h4 { font-size: 0.95rem; font-weight: 600; margin: 0.9em 0 0.35em; color: var(--heading-h4); }
+.ql-editor h5 { font-size: 0.85rem; font-weight: 600; margin: 0.8em 0 0.3em; color: var(--heading-h5); }
+.ql-editor p  { margin: 0 0 0.9em; text-indent: 4ch; }
 
 /* Bloque de captura de pantalla incrustada */
 .screenshot-block {
@@ -517,11 +539,11 @@ body {
 .ql-picker-options .ql-picker-item:hover { background: var(--bg-hover) !important; }
 
 /* Tipografía jerárquica para opciones de encabezados en el dropdown */
-.ql-picker.ql-header .ql-picker-item[data-value="1"] { font-size: 1.25rem !important; font-weight: 700; }
-.ql-picker.ql-header .ql-picker-item[data-value="2"] { font-size: 1.12rem !important; font-weight: 600; }
-.ql-picker.ql-header .ql-picker-item[data-value="3"] { font-size: 1.0rem !important; font-weight: 600; }
-.ql-picker.ql-header .ql-picker-item[data-value="4"] { font-size: 0.92rem !important; font-weight: 600; }
-.ql-picker.ql-header .ql-picker-item[data-value="5"] { font-size: 0.85rem !important; font-weight: 600; }
+.ql-picker.ql-header .ql-picker-item[data-value="1"] { font-size: 1.25rem !important; font-weight: 700; color: var(--heading-h1) !important; }
+.ql-picker.ql-header .ql-picker-item[data-value="2"] { font-size: 1.12rem !important; font-weight: 600; color: var(--heading-h2) !important; }
+.ql-picker.ql-header .ql-picker-item[data-value="3"] { font-size: 1.0rem !important; font-weight: 600; color: var(--heading-h3) !important; font-style: italic; }
+.ql-picker.ql-header .ql-picker-item[data-value="4"] { font-size: 0.92rem !important; font-weight: 600; color: var(--heading-h4) !important; }
+.ql-picker.ql-header .ql-picker-item[data-value="5"] { font-size: 0.85rem !important; font-weight: 600; color: var(--heading-h5) !important; }
 .ql-picker.ql-header .ql-picker-item:not([data-value]) { font-size: 0.85rem !important; font-weight: normal; }
 
 /* ================================================================
@@ -1526,4 +1548,382 @@ body {
     white-space: nowrap;
   }
 }
+
+/* ============================================================
+   NUEVAS FUNCIONALIDADES: TOC, TABLAS, SANGRÍAS, PÁGINAS
+   ============================================================ */
+
+/* ---- Colores de encabezados en el selector de Quill ---- */
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="1"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="1"]::before {
+  color: var(--heading-h1) !important;
+  font-weight: 700;
+}
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="2"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="2"]::before {
+  color: var(--heading-h2) !important;
+  font-weight: 600;
+  padding-left: 6px;
+}
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="3"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="3"]::before {
+  color: var(--heading-h3) !important;
+  font-weight: 600;
+  font-style: italic;
+  padding-left: 12px;
+}
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="4"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="4"]::before {
+  color: var(--heading-h4) !important;
+  font-weight: 600;
+}
+.ql-snow .ql-picker.ql-header .ql-picker-label[data-value="5"]::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item[data-value="5"]::before {
+  color: var(--heading-h5) !important;
+  font-weight: 600;
+}
+
+/* ---- Clases de Indentación Derecha y Ambos Lados ---- */
+.ql-editor .ql-indent-right-1 { margin-right: 3em !important; }
+.ql-editor .ql-indent-right-2 { margin-right: 6em !important; }
+.ql-editor .ql-indent-right-3 { margin-right: 9em !important; }
+
+.ql-editor .ql-indent-both-1 { margin-left: 3em !important; margin-right: 3em !important; }
+.ql-editor .ql-indent-both-2 { margin-left: 6em !important; margin-right: 6em !important; }
+.ql-editor .ql-indent-both-3 { margin-left: 9em !important; margin-right: 9em !important; }
+
+/* ---- División de Página Visible ---- */
+.page-break-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px dashed rgba(74, 108, 247, 0.45);
+  pointer-events: none;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 14px;
+}
+
+.page-break-badge {
+  font-size: 0.68rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--bg-surface);
+  border: 1px solid rgba(74, 108, 247, 0.35);
+  border-radius: 10px;
+  padding: 1px 8px;
+  transform: translateY(-50%);
+  user-select: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* ---- Indicador de página en la barra de scroll ---- */
+#scroll-page-tooltip {
+  position: fixed;
+  right: 22px;
+  z-index: 1000;
+  background: rgba(26, 29, 35, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(10px) translateY(-50%);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#scroll-page-tooltip.visible {
+  opacity: 1;
+  transform: translateX(0) translateY(-50%);
+}
+
+#scroll-page-tooltip::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 5px solid rgba(26, 29, 35, 0.88);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+[data-theme="dark"] #scroll-page-tooltip {
+  background: rgba(30, 33, 48, 0.92);
+  border: 1px solid var(--border);
+}
+
+/* ---- Tabs en Sidebar Izquierdo ---- */
+.sidebar-tabs-header {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.sidebar-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.sidebar-tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sidebar-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-light);
+}
+
+.sidebar-panel-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar-panel-view.hidden {
+  display: none !important;
+}
+
+/* ---- Panel de Contenido / TOC ---- */
+#toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 8px;
+}
+
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+  user-select: none;
+}
+
+.toc-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: translateX(3px);
+}
+
+.toc-item.active {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.toc-item-h1 { font-weight: 600; color: var(--heading-h1); padding-left: 8px; }
+.toc-item-h2 { padding-left: 20px; color: var(--heading-h2); }
+.toc-item-h3 { padding-left: 32px; font-style: italic; color: var(--heading-h3); }
+.toc-item-h4 { padding-left: 44px; color: var(--heading-h4); }
+.toc-item-h5 { padding-left: 54px; color: var(--heading-h5); }
+
+.toc-badge {
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-left: auto;
+}
+
+/* Pulso visual al navegar al encabezado */
+@keyframes headingPulse {
+  0%   { background-color: rgba(74, 108, 247, 0.35); }
+  100% { background-color: transparent; }
+}
+
+.heading-nav-pulse {
+  animation: headingPulse 1.8s ease-out;
+  border-radius: 4px;
+}
+
+/* ---- Bloque de TOC insertable en el documento ---- */
+.doc-toc-block {
+  margin: 24px 0;
+  padding: 20px 24px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-ui);
+}
+
+.doc-toc-block h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--text-primary);
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.doc-toc-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 6px 0;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.doc-toc-dots {
+  flex: 1;
+  border-bottom: 1px dotted var(--text-muted);
+  margin: 0 8px;
+  opacity: 0.6;
+}
+
+.doc-toc-page {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+/* ---- Bloque de Bibliografía insertable en el documento ---- */
+.doc-bib-block {
+  margin: 32px 0 16px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--border);
+}
+
+.bibliography-entry {
+  padding-left: 2.5em !important;
+  text-indent: -2.5em !important;
+  margin-bottom: 0.9em !important;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+
+/* ---- Herramienta de Tabla con Ancho Autoajustable y Wrapping Condicional ---- */
+.academic-table-container {
+  margin: 22px 0;
+  position: relative;
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.academic-table-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-sidebar);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.academic-table-controls .btn-table-group {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-table-action {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-table-action:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-focus);
+  color: var(--accent);
+}
+
+.btn-table-action.danger:hover {
+  background: var(--danger-light);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Tabla en sí */
+.academic-table {
+  border-collapse: collapse;
+  width: auto;           /* Ancho inicial ajustado automáticamente al contenido */
+  max-width: 100%;       /* Respetar márgenes de la hoja */
+  margin: 0 auto;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.academic-table th,
+.academic-table td {
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  white-space: nowrap;   /* Autoajuste al ancho de la celda más larga sin romper líneas */
+  text-align: left;
+  vertical-align: top;
+  outline: none;
+  min-width: 60px;
+}
+
+.academic-table th {
+  background-color: var(--bg-sidebar);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.academic-table td:focus,
+.academic-table th:focus {
+  background: var(--accent-light);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* Wrapping condicional: se activa SOLO cuando el ancho de columnas excede los márgenes */
+.academic-table.table-wrapped {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.academic-table.table-wrapped th,
+.academic-table.table-wrapped td {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
 

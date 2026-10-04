@@ -428,6 +428,49 @@ function checkAndRestoreActiveProject() {
 }
 
 function initQuill() {
+  // Registro de formatos personalizados en Quill (Parchment)
+  try {
+    const Parchment = Quill.import('parchment');
+    if (Parchment && Parchment.Attributor) {
+      const IndentRightClass = new Parchment.Attributor.Class('indent-right', 'ql-indent-right', {
+        scope: Parchment.Scope.BLOCK,
+        whitelist: ['1', '2', '3']
+      });
+      const IndentBothClass = new Parchment.Attributor.Class('indent-both', 'ql-indent-both', {
+        scope: Parchment.Scope.BLOCK,
+        whitelist: ['1', '2', '3']
+      });
+      Quill.register(IndentRightClass, true);
+      Quill.register(IndentBothClass, true);
+    }
+
+    const BlockEmbed = Quill.import('blots/block/embed');
+    if (BlockEmbed) {
+      class AcademicTableBlot extends BlockEmbed {
+        static create(value) {
+          const node = super.create();
+          node.setAttribute('contenteditable', 'false');
+          node.className = 'academic-table-container';
+          if (typeof value === 'string') {
+            node.innerHTML = value;
+          } else if (value && value.html) {
+            node.innerHTML = value.html;
+          }
+          return node;
+        }
+        static value(node) {
+          return { html: node.innerHTML };
+        }
+      }
+      AcademicTableBlot.blotName = 'academic-table';
+      AcademicTableBlot.tagName = 'div';
+      AcademicTableBlot.className = 'academic-table-container';
+      Quill.register(AcademicTableBlot, true);
+    }
+  } catch (err) {
+    console.debug('Aviso al registrar formatos personalizados en Quill:', err);
+  }
+
   App.quill = new Quill('#quill-editor', {
     theme: 'snow',
     modules: {
@@ -489,6 +532,11 @@ function initQuill() {
     updateWordCount(currentWC);
     updateTelemetryUI();
 
+    // Actualizar TOC, cálculo de páginas y tablas
+    scheduleUpdateTOC();
+    updatePageMetrics();
+    adjustAllTablesWrapping();
+
     // Bug fix: limpiar formato 'background' activo si el usuario está escribiendo
     // manualmente (no pegando), para que el color de procedencia no se propague
     if (!App.session.isPasting && source === 'user') {
@@ -522,6 +570,17 @@ function initQuill() {
     editorEl.addEventListener('paste', handlePasteEvent);
     editorEl.addEventListener('keydown', handleKeystrokeEvent);
     editorEl.addEventListener('keyup', handleKeyUpEvent);
+    editorEl.addEventListener('input', (e) => {
+      scheduleUpdateTOC();
+      updatePageMetrics();
+      const table = e.target.closest('.academic-table');
+      if (table) {
+        adjustTableWrapping(table);
+        App.ui.isDirty = true;
+        updateSaveStatus('unsaved');
+      }
+    });
+    editorEl.addEventListener('click', handleTableActionClick);
   }
 }
 
@@ -770,8 +829,10 @@ async function openOrCreateProject(mode) {
     closeModal('modal-onboarding-overlay');
     App.ui.projectLoaded = true;
 
-    // Actualizar nombre del proyecto en statusbar
-    document.getElementById('sb-project-name').textContent = dirHandle.name;
+    // Actualizar nombre del proyecto en statusbar (si existe) y métricas de página
+    const sbProj = document.getElementById('sb-project-name');
+    if (sbProj) sbProj.textContent = dirHandle.name;
+    updatePageMetrics();
     document.getElementById('open-folder-label').textContent = 'Cambiar carpeta';
 
     // Iniciar autoguardado (cada 15 segundos)
@@ -952,6 +1013,9 @@ async function loadExistingProject(dirHandle) {
 
     // Cargar fuentes en el panel
     renderSourcesList();
+    updateTableOfContents();
+    updatePageMetrics();
+    setTimeout(() => adjustAllTablesWrapping(), 120);
 
     // Contar palabras
     const currentWC = countWords(App.quill.getText());
@@ -1059,6 +1123,9 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
   if (titleInput) titleInput.value = App.project.metadata.title || '';
 
   renderSourcesList();
+  updateTableOfContents();
+  updatePageMetrics();
+  setTimeout(() => adjustAllTablesWrapping(), 120);
 
   const currentWC = countWords(App.quill ? App.quill.getText() : '');
   updateWordCount(currentWC);
@@ -1492,6 +1559,9 @@ function deleteSource(id) {
 }
 
 function renderSourcesList() {
+  const countBadge = document.getElementById('sources-count-badge');
+  if (countBadge) countBadge.textContent = App.project.sources.length;
+
   const container = document.getElementById('sources-list');
   if (App.project.sources.length === 0) {
     container.innerHTML = `<p class="text-sm text-muted" style="padding: 8px 4px;">
@@ -2214,6 +2284,67 @@ function initEventListeners() {
   document.getElementById('btn-insert-citation').addEventListener('click', () => openCitationModal());
   document.getElementById('btn-insert-screenshot').addEventListener('click', insertScreenshotAtCursor);
 
+  // Pestañas del sidebar izquierdo (Fuentes / Contenido TOC)
+  initSidebarTabs();
+
+  // Botones de Indentación: Izquierda, Derecha, Ambas
+  const btnIndLeft = document.getElementById('btn-indent-left');
+  if (btnIndLeft) btnIndLeft.addEventListener('click', applyIndentLeft);
+  const btnIndRight = document.getElementById('btn-indent-right');
+  if (btnIndRight) btnIndRight.addEventListener('click', applyIndentRight);
+  const btnIndBoth = document.getElementById('btn-indent-both');
+  if (btnIndBoth) btnIndBoth.addEventListener('click', applyIndentBoth);
+
+  // Tabla: abrir modal y confirmar inserción
+  const btnInsTable = document.getElementById('btn-insert-table');
+  if (btnInsTable) btnInsTable.addEventListener('click', openTableModal);
+  const btnConfTable = document.getElementById('btn-confirm-insert-table');
+  if (btnConfTable) btnConfTable.addEventListener('click', insertTableAtCursor);
+  const btnCloseTable = document.getElementById('close-modal-table');
+  if (btnCloseTable) btnCloseTable.addEventListener('click', closeTableModal);
+  const btnCancelTable = document.getElementById('cancel-modal-table');
+  if (btnCancelTable) btnCancelTable.addEventListener('click', closeTableModal);
+
+  // TOC: actualizar e insertar
+  const btnRefreshToc = document.getElementById('btn-refresh-toc');
+  if (btnRefreshToc) btnRefreshToc.addEventListener('click', () => {
+    updateTableOfContents();
+    showToast('Índice actualizado.', 'info');
+  });
+  const btnInsertToc = document.getElementById('btn-insert-toc');
+  if (btnInsertToc) btnInsertToc.addEventListener('click', insertTableOfContentsIntoDoc);
+  const btnInsertTocTb = document.getElementById('btn-insert-toc-tb');
+  if (btnInsertTocTb) btnInsertTocTb.addEventListener('click', insertTableOfContentsIntoDoc);
+
+  // Bibliografía: insertar en documento
+  const btnInsertBibTb = document.getElementById('btn-insert-bib-tb');
+  if (btnInsertBibTb) btnInsertBibTb.addEventListener('click', insertBibliographyIntoDoc);
+
+  // Scrollbar: scroll y arrastre para actualizar indicador de página y tooltip
+  const editorArea = document.getElementById('editor-area');
+  if (editorArea) {
+    editorArea.addEventListener('scroll', () => {
+      updatePageMetrics(true);
+    });
+
+    let isDraggingScroll = false;
+    editorArea.addEventListener('pointerdown', (e) => {
+      const rect = editorArea.getBoundingClientRect();
+      if (e.clientX >= rect.right - 28) {
+        isDraggingScroll = true;
+        updatePageMetrics(true);
+      }
+    });
+    window.addEventListener('pointerup', () => {
+      isDraggingScroll = false;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (isDraggingScroll) {
+        updatePageMetrics(true);
+      }
+    });
+  }
+
   // Modal fuente
   document.getElementById('save-source').addEventListener('click', saveSource);
   document.getElementById('cancel-source').addEventListener('click', () => closeModal('modal-source-overlay'));
@@ -2279,7 +2410,7 @@ function initEventListeners() {
   // Cerrar modales con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay','modal-save-stats-overlay'].forEach(id => closeModal(id));
+      ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay','modal-save-stats-overlay','modal-table-overlay'].forEach(id => closeModal(id));
       closeMobileMenu();
     }
   });
@@ -2738,3 +2869,475 @@ function importBibtex() {
     if (entries.length === 1) closeModal('modal-source-overlay');
   }
 }
+
+/* ================================================================
+   MÓDULOS DE NUEVAS FUNCIONALIDADES:
+   - Pestañas de Sidebar (Fuentes / Contenido TOC)
+   - Indentación (Izquierda, Derecha, Ambas)
+   - Tabla con Autoajuste y Wrapping Condicional
+   - Tabla de Contenidos (TOC Navegable, Auto-actualizable, Insertable)
+   - Bibliografía Insertable
+   - División de Página Visible, Statusbar y Scroll Tooltip
+   ================================================================ */
+
+// ---- Pestañas del Sidebar Izquierdo ----
+function initSidebarTabs() {
+  const tabSources = document.getElementById('tab-btn-sources');
+  const tabToc = document.getElementById('tab-btn-toc');
+  const viewSources = document.getElementById('view-sources');
+  const viewToc = document.getElementById('view-toc');
+
+  if (tabSources && tabToc && viewSources && viewToc) {
+    tabSources.addEventListener('click', () => {
+      tabSources.classList.add('active');
+      tabToc.classList.remove('active');
+      viewSources.classList.remove('hidden');
+      viewToc.classList.add('hidden');
+    });
+    tabToc.addEventListener('click', () => {
+      tabToc.classList.add('active');
+      tabSources.classList.remove('active');
+      viewToc.classList.remove('hidden');
+      viewSources.classList.add('hidden');
+      updateTableOfContents();
+    });
+  }
+}
+
+// ---- Indentación ----
+function applyIndentLeft() {
+  if (!App.quill) return;
+  const range = App.quill.getSelection(true);
+  if (!range) return;
+  const formats = App.quill.getFormat(range);
+  const cur = parseInt(formats.indent || 0, 10);
+  const next = cur >= 3 ? false : cur + 1;
+  App.quill.format('indent', next, 'user');
+  App.ui.isDirty = true;
+  updateSaveStatus('unsaved');
+}
+
+function applyIndentRight() {
+  if (!App.quill) return;
+  const range = App.quill.getSelection(true);
+  if (!range) return;
+  const formats = App.quill.getFormat(range);
+  const cur = parseInt(formats['indent-right'] || 0, 10);
+  const next = cur >= 3 ? false : String(cur + 1);
+  App.quill.format('indent-right', next, 'user');
+  App.ui.isDirty = true;
+  updateSaveStatus('unsaved');
+}
+
+function applyIndentBoth() {
+  if (!App.quill) return;
+  const range = App.quill.getSelection(true);
+  if (!range) return;
+  const formats = App.quill.getFormat(range);
+  const cur = parseInt(formats['indent-both'] || 0, 10);
+  const next = cur >= 3 ? false : String(cur + 1);
+  App.quill.format('indent-both', next, 'user');
+  App.ui.isDirty = true;
+  updateSaveStatus('unsaved');
+}
+
+// ---- Tabla Académica ----
+function openTableModal() {
+  openModal('modal-table-overlay');
+}
+
+function closeTableModal() {
+  closeModal('modal-table-overlay');
+}
+
+function insertTableAtCursor() {
+  const rowsInput = document.getElementById('table-input-rows');
+  const colsInput = document.getElementById('table-input-cols');
+  const hasHeader = document.getElementById('table-input-has-header')?.checked ?? true;
+
+  const rows = Math.max(1, Math.min(25, parseInt(rowsInput?.value || 3, 10)));
+  const cols = Math.max(1, Math.min(10, parseInt(colsInput?.value || 3, 10)));
+
+  let tableHtml = `<div class="academic-table-controls">
+    <span><strong>Tabla</strong> (<span class="col-count">${cols}</span>×<span class="row-count">${rows}</span>)</span>
+    <div class="btn-table-group">
+      <button type="button" class="btn-table-action btn-add-row" title="Agregar fila al final">+ Fila</button>
+      <button type="button" class="btn-table-action btn-add-col" title="Agregar columna a la derecha">+ Columna</button>
+      <button type="button" class="btn-table-action btn-del-row" title="Eliminar última fila">- Fila</button>
+      <button type="button" class="btn-table-action btn-del-col" title="Eliminar última columna">- Columna</button>
+      <button type="button" class="btn-table-action danger btn-del-table" title="Eliminar esta tabla">✕ Eliminar</button>
+    </div>
+  </div>
+  <table class="academic-table">`;
+
+  for (let r = 0; r < rows; r++) {
+    tableHtml += `<tr>`;
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 && hasHeader) {
+        tableHtml += `<th contenteditable="true">Encabezado ${c + 1}</th>`;
+      } else {
+        tableHtml += `<td contenteditable="true">Dato ${r + 1},${c + 1}</td>`;
+      }
+    }
+    tableHtml += `</tr>`;
+  }
+  tableHtml += `</table>`;
+
+  if (App.quill) {
+    const range = App.quill.getSelection(true) || { index: App.quill.getLength(), length: 0 };
+    App.quill.insertEmbed(range.index, 'academic-table', { html: tableHtml }, 'user');
+    App.quill.setSelection(range.index + 1, 0, 'silent');
+    closeTableModal();
+    showToast(`✓ Tabla de ${rows}×${cols} insertada.`, 'success');
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+    setTimeout(() => adjustAllTablesWrapping(), 80);
+  }
+}
+
+function adjustTableWrapping(tableEl) {
+  if (!tableEl) return;
+  const container = document.getElementById('document-sheet') || tableEl.parentElement;
+  if (!container) return;
+
+  // Remueve primero el wrapping para medir el ancho natural requerido por las celdas
+  tableEl.classList.remove('table-wrapped');
+
+  // Ancho disponible en la hoja descontando padding interior
+  const availableWidth = container.clientWidth - 130;
+
+  // Si el ancho natural de la tabla excede los márgenes, se activa el wrapping
+  if (tableEl.scrollWidth > availableWidth) {
+    tableEl.classList.add('table-wrapped');
+  } else {
+    tableEl.classList.remove('table-wrapped');
+  }
+}
+
+function adjustAllTablesWrapping() {
+  const tables = document.querySelectorAll('.academic-table');
+  tables.forEach(table => adjustTableWrapping(table));
+}
+
+function handleTableActionClick(e) {
+  const btn = e.target.closest('.btn-table-action');
+  if (!btn) return;
+
+  const container = btn.closest('.academic-table-container');
+  if (!container) return;
+  const table = container.querySelector('.academic-table');
+  if (!table) return;
+
+  if (btn.classList.contains('btn-add-row')) {
+    const rows = table.querySelectorAll('tr');
+    const colsCount = rows[0] ? rows[0].children.length : 1;
+    const newTr = document.createElement('tr');
+    for (let c = 0; c < colsCount; c++) {
+      const td = document.createElement('td');
+      td.setAttribute('contenteditable', 'true');
+      td.textContent = `Dato ${rows.length + 1},${c + 1}`;
+      newTr.appendChild(td);
+    }
+    table.appendChild(newTr);
+    updateTableRowColDisplay(container, table);
+    adjustTableWrapping(table);
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+  } else if (btn.classList.contains('btn-add-col')) {
+    const rows = table.querySelectorAll('tr');
+    rows.forEach((tr, rIdx) => {
+      const isTh = tr.children[0] && tr.children[0].tagName === 'TH';
+      const cell = document.createElement(isTh ? 'th' : 'td');
+      cell.setAttribute('contenteditable', 'true');
+      cell.textContent = isTh ? `Encabezado ${tr.children.length + 1}` : `Dato ${rIdx + 1},${tr.children.length + 1}`;
+      tr.appendChild(cell);
+    });
+    updateTableRowColDisplay(container, table);
+    adjustTableWrapping(table);
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+  } else if (btn.classList.contains('btn-del-row')) {
+    const rows = table.querySelectorAll('tr');
+    if (rows.length > 1) {
+      rows[rows.length - 1].remove();
+      updateTableRowColDisplay(container, table);
+      adjustTableWrapping(table);
+      App.ui.isDirty = true;
+      updateSaveStatus('unsaved');
+    } else {
+      showToast('La tabla debe conservar al menos 1 fila.', 'warning');
+    }
+  } else if (btn.classList.contains('btn-del-col')) {
+    const rows = table.querySelectorAll('tr');
+    if (rows[0] && rows[0].children.length > 1) {
+      rows.forEach(tr => {
+        if (tr.lastElementChild) tr.lastElementChild.remove();
+      });
+      updateTableRowColDisplay(container, table);
+      adjustTableWrapping(table);
+      App.ui.isDirty = true;
+      updateSaveStatus('unsaved');
+    } else {
+      showToast('La tabla debe conservar al menos 1 columna.', 'warning');
+    }
+  } else if (btn.classList.contains('btn-del-table')) {
+    if (confirm('¿Eliminar esta tabla por completo?')) {
+      container.remove();
+      App.ui.isDirty = true;
+      updateSaveStatus('unsaved');
+      showToast('Tabla eliminada.', 'info');
+    }
+  }
+}
+
+function updateTableRowColDisplay(container, table) {
+  const rowSpan = container.querySelector('.row-count');
+  const colSpan = container.querySelector('.col-count');
+  const rows = table.querySelectorAll('tr');
+  if (rowSpan) rowSpan.textContent = rows.length;
+  if (colSpan && rows[0]) colSpan.textContent = rows[0].children.length;
+}
+
+// ---- Tabla de Contenidos (TOC) ----
+let tocDebounceTimer = null;
+function scheduleUpdateTOC() {
+  clearTimeout(tocDebounceTimer);
+  tocDebounceTimer = setTimeout(() => {
+    updateTableOfContents();
+  }, 250);
+}
+
+function getDocumentHeadings() {
+  const editor = document.querySelector('#quill-editor .ql-editor');
+  if (!editor) return [];
+
+  const headings = [];
+  const elements = editor.querySelectorAll('h1, h2, h3, h4, h5');
+  elements.forEach((el, index) => {
+    const text = el.textContent.trim();
+    if (!text) return;
+    const level = parseInt(el.tagName.replace('H', ''), 10);
+    const id = el.id || `doc-heading-${index + 1}`;
+    el.id = id;
+
+    // Calcular página simulada (1056px por página)
+    const elOffset = el.offsetTop;
+    const pageNum = Math.max(1, Math.floor(elOffset / 1056) + 1);
+
+    headings.push({
+      id,
+      level,
+      text,
+      pageNum,
+      element: el
+    });
+  });
+  return headings;
+}
+
+function updateTableOfContents() {
+  const tocList = document.getElementById('toc-list');
+  if (!tocList) return;
+
+  const headings = getDocumentHeadings();
+  if (headings.length === 0) {
+    tocList.innerHTML = `
+      <p class="text-sm text-muted" style="padding: 12px 6px; line-height: 1.5;">
+        Aún no hay títulos en el documento. Usa el selector de encabezados (Título 1 a 5) en la barra superior para estructurar tu trabajo.
+      </p>
+    `;
+    return;
+  }
+
+  let html = '';
+  headings.forEach(h => {
+    html += `
+      <div class="toc-item toc-item-h${h.level}" data-heading-id="${h.id}" title="${escapeHtml(h.text)} (Pág. ${h.pageNum})">
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(h.text)}</span>
+        <span class="toc-badge">P.${h.pageNum}</span>
+      </div>
+    `;
+  });
+  tocList.innerHTML = html;
+
+  tocList.querySelectorAll('.toc-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const hId = item.getAttribute('data-heading-id');
+      const targetEl = document.getElementById(hId);
+      if (targetEl) {
+        const editorArea = document.getElementById('editor-area');
+        if (editorArea) {
+          const sheet = document.getElementById('document-sheet');
+          const targetTop = targetEl.offsetTop + (sheet ? sheet.offsetTop : 0) - 20;
+          editorArea.scrollTo({ top: targetTop, behavior: 'smooth' });
+        }
+        targetEl.classList.remove('heading-nav-pulse');
+        void targetEl.offsetWidth; // forzar reflow
+        targetEl.classList.add('heading-nav-pulse');
+      }
+    });
+  });
+}
+
+function insertTableOfContentsIntoDoc() {
+  const headings = getDocumentHeadings();
+  if (headings.length === 0) {
+    showToast('No se encontraron títulos en el documento para crear el índice.', 'warning');
+    return;
+  }
+
+  let tocHtml = `<div class="doc-toc-block" contenteditable="false">`;
+  tocHtml += `<h3>ÍNDICE GENERAL</h3>`;
+  headings.forEach(h => {
+    const indentPx = (h.level - 1) * 16;
+    tocHtml += `
+      <div class="doc-toc-row" style="padding-left: ${indentPx}px;">
+        <span>${escapeHtml(h.text)}</span>
+        <span class="doc-toc-dots"></span>
+        <span class="doc-toc-page">Pág. ${h.pageNum}</span>
+      </div>
+    `;
+  });
+  tocHtml += `</div><p><br></p>`;
+
+  if (App.quill) {
+    const range = App.quill.getSelection(true) || { index: 0, length: 0 };
+    App.quill.clipboard.dangerouslyPasteHTML(range.index, tocHtml, 'user');
+    showToast(`📋 Índice general insertado con ${headings.length} secciones.`, 'success');
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+  }
+}
+
+// ---- Bibliografía Insertable ----
+function insertBibliographyIntoDoc() {
+  const sources = App.project.sources || [];
+  if (sources.length === 0) {
+    showToast('No hay fuentes registradas para generar la bibliografía. Agrégalas en el panel izquierdo.', 'warning');
+    return;
+  }
+
+  // Ordenar alfabéticamente por apellido del primer autor o título
+  const sorted = [...sources].sort((a, b) => {
+    const authorA = (a.authors && a.authors[0]) ? a.authors[0].toLowerCase() : (a.title || '').toLowerCase();
+    const authorB = (b.authors && b.authors[0]) ? b.authors[0].toLowerCase() : (b.title || '').toLowerCase();
+    return authorA.localeCompare(authorB);
+  });
+
+  const style = App.project.metadata.citation_style || 'chicago-note';
+
+  let bibHtml = `<div class="doc-bib-block"><h2>Bibliografía</h2>`;
+  sorted.forEach(src => {
+    const entryText = formatBibliographyEntry(src, style);
+    bibHtml += `<p class="bibliography-entry">${entryText}</p>`;
+  });
+  bibHtml += `</div><p><br></p>`;
+
+  if (App.quill) {
+    const length = App.quill.getLength();
+    App.quill.clipboard.dangerouslyPasteHTML(length, bibHtml, 'user');
+    showToast(`📚 Bibliografía con ${sorted.length} fuentes insertada al final del documento.`, 'success');
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+  }
+}
+
+function formatBibliographyEntry(src, style) {
+  const authors = src.authors || [];
+  const year    = src.year || 's. f.';
+  const title   = src.title || 'Sin título';
+  const journal = src.journal || '';
+  const doi     = src.doi ? ` https://doi.org/${src.doi.replace(/^https?:\/\/doi\.org\//, '')}` : '';
+
+  if (style === 'apa') {
+    const authorStr = authors.length > 0 ? authors.join(', ') : 'Autor desconocido';
+    if (src.type === 'journal') {
+      return `${authorStr} (${year}). ${title}. <em>${journal}</em>.${doi}`;
+    }
+    return `${authorStr} (${year}). <em>${title}</em>.${doi}`;
+  }
+
+  // Chicago nota completa / bibliografía
+  const authorStr = authors.length > 0
+    ? authors.map((a, i) => {
+        const norm = normalizeAuthorName(a);
+        if (i === 0) {
+          return norm.firstName ? `${norm.lastName}, ${norm.firstName}` : norm.lastName;
+        }
+        return norm.firstName ? `${norm.firstName} ${norm.lastName}` : norm.lastName;
+      }).join(', ')
+    : 'Autor desconocido';
+
+  if (src.type === 'journal') {
+    return `${authorStr}. "${title}." <em>${journal}</em> (${year}).${doi}`;
+  }
+  return `${authorStr}. <em>${title}</em> (${year}).${doi}`;
+}
+
+// ---- División de Página Visible, Statusbar y Scroll Tooltip ----
+const PAGE_HEIGHT = 1056; // Altura estándar de página Carta/A4 a 96dpi
+
+function updatePageMetrics(fromScroll = false) {
+  const editorArea = document.getElementById('editor-area');
+  const sheet = document.getElementById('document-sheet');
+  const indicator = document.getElementById('sb-page-indicator');
+  if (!editorArea || !sheet) return;
+
+  const sheetHeight = Math.max(sheet.scrollHeight, 1056);
+  const totalPages = Math.max(1, Math.ceil(sheetHeight / PAGE_HEIGHT));
+
+  const scrollTop = editorArea.scrollTop;
+  const viewMiddle = scrollTop + (editorArea.clientHeight / 3);
+  const currentPage = Math.min(totalPages, Math.max(1, Math.floor(viewMiddle / PAGE_HEIGHT) + 1));
+
+  if (indicator) {
+    indicator.textContent = `Pág. ${currentPage} de ${totalPages}`;
+  }
+
+  // Actualizar líneas visibles de corte de página
+  updateVisiblePageBreaks(totalPages);
+
+  // Si proviene de interacción con scroll o se requiere tooltip
+  if (fromScroll) {
+    showScrollPageTooltip(currentPage, totalPages);
+  }
+}
+
+function updateVisiblePageBreaks(totalPages) {
+  const sheet = document.getElementById('document-sheet');
+  if (!sheet) return;
+
+  const existingBreaks = sheet.querySelectorAll('.page-break-line');
+  if (existingBreaks.length === (totalPages - 1)) return; // ya sincronizado
+
+  existingBreaks.forEach(b => b.remove());
+  for (let p = 2; p <= totalPages; p++) {
+    const breakEl = document.createElement('div');
+    breakEl.className = 'page-break-line';
+    breakEl.style.top = `${(p - 1) * PAGE_HEIGHT}px`;
+    breakEl.innerHTML = `<span class="page-break-badge">Página ${p}</span>`;
+    sheet.appendChild(breakEl);
+  }
+}
+
+let tooltipHideTimer = null;
+function showScrollPageTooltip(currentPage, totalPages) {
+  const tooltip = document.getElementById('scroll-page-tooltip');
+  const editorArea = document.getElementById('editor-area');
+  if (!tooltip || !editorArea) return;
+
+  const maxScroll = editorArea.scrollHeight - editorArea.clientHeight;
+  const ratio = maxScroll > 0 ? (editorArea.scrollTop / maxScroll) : 0;
+  const clientH = editorArea.clientHeight;
+  const topPx = Math.max(70, Math.min(clientH - 60, ratio * (clientH - 120) + 70));
+
+  tooltip.style.top = `${topPx}px`;
+  tooltip.textContent = `Pág. ${currentPage} de ${totalPages}`;
+  tooltip.classList.add('visible');
+
+  clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = setTimeout(() => {
+    tooltip.classList.remove('visible');
+  }, 1200);
+}
+
