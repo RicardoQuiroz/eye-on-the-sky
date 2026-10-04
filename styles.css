@@ -1244,14 +1244,29 @@ body {
 }
 
 #btn-hamburger-menu {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 6px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
   color: var(--text-primary);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: all var(--transition);
+}
+
+#btn-hamburger-menu:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+#btn-toggle-toc:hover {
+  color: #0284c7 !important;
 }
 
 .mobile-drawer-overlay {
@@ -1403,15 +1418,16 @@ body {
    REGLAS RESPONSIVAS
    ================================================================ */
 
-/* Pantallas grandes (Desktop / Laptop): Mantiene intacto el diseño actual */
+/* Pantallas grandes (Desktop / Laptop / Windows): Mantiene la barra de acciones y el menú hamburguesa visible */
 @media (min-width: 769px) {
   #btn-hamburger-menu {
-    display: none !important;
+    display: inline-flex !important;
   }
   .topbar-actions {
     display: flex !important;
   }
-  .mobile-drawer-overlay {
+  /* En pantallas de escritorio se ocultan los accesos directos redundantes de móvil */
+  .header-nav-shortcuts {
     display: none !important;
   }
 

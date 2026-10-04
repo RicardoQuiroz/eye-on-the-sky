@@ -92,6 +92,7 @@ const App = {
   ui: {
     sourcesPanelOpen: true,
     telePanelOpen:    false,
+    activeSidebarTab: 'sources', // 'sources' | 'toc'
     isDirty:          false,  // hay cambios sin guardar
     currentTheme:     'light',
     projectLoaded:    false,
@@ -2246,35 +2247,71 @@ function initEventListeners() {
   });
 
   // Funciones de control de paneles laterales
-  function openSourcesPanel() {
-    const sidebar = document.getElementById('sidebar-sources');
-    if (!sidebar) return;
-    App.ui.sourcesPanelOpen = true;
-    sidebar.classList.remove('collapsed');
-    switchSidebarTab('sources');
-    if (window.innerWidth <= 900) {
-      const tele = document.getElementById('sidebar-telemetry');
-      App.ui.telePanelOpen = false;
-      if (tele) tele.classList.add('collapsed');
-    }
-    updatePanelBackdrop();
-  }
-  window.openSourcesPanel = openSourcesPanel;
 
-  function openTocPanel() {
+  /**
+   * Alterna o activa el panel izquierdo en la pestaña "Fuentes".
+   * - Si el panel está cerrado: lo abre y activa la pestaña "Fuentes".
+   * - Si está abierto pero mostrando otra pestaña (ej. TOC): cambia a la pestaña "Fuentes" sin cerrar.
+   * - Si ya está abierto mostrando la pestaña "Fuentes": lo cierra (toggle).
+   */
+  function toggleSourcesPanel() {
     const sidebar = document.getElementById('sidebar-sources');
     if (!sidebar) return;
-    App.ui.sourcesPanelOpen = true;
-    sidebar.classList.remove('collapsed');
-    switchSidebarTab('toc');
-    if (window.innerWidth <= 900) {
-      const tele = document.getElementById('sidebar-telemetry');
-      App.ui.telePanelOpen = false;
-      if (tele) tele.classList.add('collapsed');
+
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const isAlreadyOnSources = !isCollapsed && App.ui.activeSidebarTab === 'sources';
+
+    if (isAlreadyOnSources) {
+      sidebar.classList.add('collapsed');
+      App.ui.sourcesPanelOpen = false;
+    } else {
+      sidebar.classList.remove('collapsed');
+      App.ui.sourcesPanelOpen = true;
+      switchSidebarTab('sources');
+      if (window.innerWidth <= 900) {
+        const tele = document.getElementById('sidebar-telemetry');
+        App.ui.telePanelOpen = false;
+        if (tele) tele.classList.add('collapsed');
+      }
     }
     updatePanelBackdrop();
+    if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
   }
-  window.openTocPanel = openTocPanel;
+  window.toggleSourcesPanel = toggleSourcesPanel;
+  window.openSourcesPanel = toggleSourcesPanel;
+
+  /**
+   * Alterna o activa el panel izquierdo en la pestaña "Contenido / TOC".
+   * - Si el panel está cerrado: lo abre y activa la pestaña "TOC".
+   * - Si está abierto pero mostrando otra pestaña (ej. Fuentes): cambia a la pestaña "TOC" sin cerrar.
+   * - Si ya está abierto mostrando la pestaña "TOC": lo cierra (toggle).
+   */
+  function toggleTocPanel() {
+    const sidebar = document.getElementById('sidebar-sources');
+    if (!sidebar) return;
+
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const isAlreadyOnToc = !isCollapsed && App.ui.activeSidebarTab === 'toc';
+
+    if (isAlreadyOnToc) {
+      sidebar.classList.add('collapsed');
+      App.ui.sourcesPanelOpen = false;
+    } else {
+      sidebar.classList.remove('collapsed');
+      App.ui.sourcesPanelOpen = true;
+      switchSidebarTab('toc');
+      updateTableOfContents();
+      if (window.innerWidth <= 900) {
+        const tele = document.getElementById('sidebar-telemetry');
+        App.ui.telePanelOpen = false;
+        if (tele) tele.classList.add('collapsed');
+      }
+    }
+    updatePanelBackdrop();
+    if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
+  }
+  window.toggleTocPanel = toggleTocPanel;
+  window.openTocPanel = toggleTocPanel;
 
   function toggleTelemetryPanel(forceOpen) {
     const sidebar = document.getElementById('sidebar-telemetry');
@@ -2293,21 +2330,10 @@ function initEventListeners() {
   }
   window.toggleTelemetryPanel = toggleTelemetryPanel;
 
-  // Toggle sidebars botones originales
+  // Toggle sidebars botones barra superior (Desktop)
   const btnToggleSources = document.getElementById('btn-toggle-sources');
   if (btnToggleSources) {
-    btnToggleSources.addEventListener('click', () => {
-      const sidebar = document.getElementById('sidebar-sources');
-      App.ui.sourcesPanelOpen = !App.ui.sourcesPanelOpen;
-      sidebar.classList.toggle('collapsed', !App.ui.sourcesPanelOpen);
-      if (App.ui.sourcesPanelOpen && window.innerWidth <= 900) {
-        const tele = document.getElementById('sidebar-telemetry');
-        App.ui.telePanelOpen = false;
-        if (tele) tele.classList.add('collapsed');
-      }
-      updatePanelBackdrop();
-      if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
-    });
+    btnToggleSources.addEventListener('click', toggleSourcesPanel);
   }
 
   const btnToggleTele = document.getElementById('btn-toggle-tele');
@@ -2315,13 +2341,18 @@ function initEventListeners() {
     btnToggleTele.addEventListener('click', () => toggleTelemetryPanel());
   }
 
-  // Atajos coloreados superiores junto al menú hamburguesa
+  const btnToggleToc = document.getElementById('btn-toggle-toc');
+  if (btnToggleToc) {
+    btnToggleToc.addEventListener('click', toggleTocPanel);
+  }
+
+  // Atajos superiores coloreados (Móviles / Pantallas reducidas)
   const btnNavSources = document.getElementById('btn-nav-sources');
   if (btnNavSources) {
     btnNavSources.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openSourcesPanel();
+      toggleSourcesPanel();
     });
   }
   const btnNavToc = document.getElementById('btn-nav-toc');
@@ -2329,7 +2360,7 @@ function initEventListeners() {
     btnNavToc.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openTocPanel();
+      toggleTocPanel();
     });
   }
   const btnNavTele = document.getElementById('btn-nav-tele');
@@ -2644,12 +2675,21 @@ function updateMobileMenuUI() {
     mobWc.textContent = sbWc.textContent;
   }
 
-  // Paneles de fuentes y telemetría
+  // Paneles de fuentes, TOC y telemetría
   const badgeSources = document.getElementById('mob-badge-sources');
+  const badgeToc = document.getElementById('mob-badge-toc');
   const badgeTele = document.getElementById('mob-badge-tele');
+  const isSidebarOpen = App.ui.sourcesPanelOpen;
+
   if (badgeSources) {
-    badgeSources.textContent = App.ui.sourcesPanelOpen ? 'Abierto' : 'Oculto';
-    badgeSources.style.color = App.ui.sourcesPanelOpen ? 'var(--accent)' : 'var(--text-secondary)';
+    const isSourcesActive = isSidebarOpen && App.ui.activeSidebarTab === 'sources';
+    badgeSources.textContent = isSourcesActive ? 'Abierto' : 'Oculto';
+    badgeSources.style.color = isSourcesActive ? 'var(--accent)' : 'var(--text-secondary)';
+  }
+  if (badgeToc) {
+    const isTocActive = isSidebarOpen && App.ui.activeSidebarTab === 'toc';
+    badgeToc.textContent = isTocActive ? 'Abierto' : 'Oculto';
+    badgeToc.style.color = isTocActive ? 'var(--accent)' : 'var(--text-secondary)';
   }
   if (badgeTele) {
     badgeTele.textContent = App.ui.telePanelOpen ? 'Abierto' : 'Oculto';
@@ -2711,16 +2751,15 @@ function initMobileMenu() {
   const mobSources = document.getElementById('mob-btn-toggle-sources');
   if (mobSources) {
     mobSources.addEventListener('click', () => {
-      const sidebar = document.getElementById('sidebar-sources');
-      App.ui.sourcesPanelOpen = !App.ui.sourcesPanelOpen;
-      if (sidebar) sidebar.classList.toggle('collapsed', !App.ui.sourcesPanelOpen);
-      if (App.ui.sourcesPanelOpen && window.innerWidth <= 900) {
-        const tele = document.getElementById('sidebar-telemetry');
-        App.ui.telePanelOpen = false;
-        if (tele) tele.classList.add('collapsed');
-      }
-      updatePanelBackdrop();
-      updateMobileMenuUI();
+      toggleSourcesPanel();
+      closeMobileMenu();
+    });
+  }
+
+  const mobToc = document.getElementById('mob-btn-toggle-toc');
+  if (mobToc) {
+    mobToc.addEventListener('click', () => {
+      toggleTocPanel();
       closeMobileMenu();
     });
   }
@@ -2977,6 +3016,7 @@ function importBibtex() {
 
 // ---- Pestañas del Sidebar Izquierdo ----
 function switchSidebarTab(tabName) {
+  App.ui.activeSidebarTab = tabName;
   const tabSources = document.getElementById('tab-btn-sources');
   const tabToc = document.getElementById('tab-btn-toc');
   const viewSources = document.getElementById('view-sources');
@@ -3006,6 +3046,7 @@ function switchSidebarTab(tabName) {
       viewSources.style.display = 'flex';
     }
   }
+  if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
 }
 window.switchSidebarTab = switchSidebarTab;
 

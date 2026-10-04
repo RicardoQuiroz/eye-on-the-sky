@@ -308,23 +308,35 @@ Desde el menú **Exportar**:
 
 ---
 
-### 📱 5.11. Modo Móvil y Menú Hamburguesa Autoexplicativo
+### 📱 5.11. Modos de Visualización: Windows (Escritorio) y Android/iOS (Móvil)
 
-Para garantizar la mejor experiencia tanto en computadoras de escritorio como en teléfonos móviles inteligentes (iPhone y Android), el editor implementa una interfaz responsiva adaptable:
+Para garantizar la mejor experiencia adaptada tanto a computadoras de escritorio (Windows, Mac, Linux) como a dispositivos móviles táctiles (Android, iPhone), la barra superior y los paneles diferencian de forma inteligente su interfaz:
 
-- 💻 **En pantallas grandes (Desktop / Laptop $\ge$ 769px):**
-  - Mantiene intacto el diseño original con todos los accesos directos visibles en la barra superior (paneles de fuentes, telemetría, cambio de tema, audio, menú de exportación y vinculación de carpeta).
-  - El título de la barra superior se mantiene limpio y enfocado exclusivamente en el logo y el título editable del documento del estudiante.
+- 💻 **En Windows y computadoras de escritorio ($\ge$ 769px):**
+  - **Barra de acciones limpia y unificada:** Reúne las herramientas en la barra principal sin duplicados redundantes:
+    - 📖 **Panel de fuentes bibliográficas (`#btn-toggle-sources`)**
+    - 📈 **Panel de actividad y salud (`#btn-toggle-tele`)**
+    - 📑 **Índice / Esquema TOC (`#btn-toggle-toc`):** Ubicado en la barra de escritorio exactamente entre el ícono de actividad y el selector de tema, permitiendo invocar la estructura de contenidos con un solo clic.
+    - ☀️/🌙 Cambio de tema claro/oscuro
+    - 🔔 Efectos de sonido
+    - 💾 Guardar ahora (con estadísticas)
+    - 📦 Menú de exportación (PDF, Word, RIS, JSON)
+    - 🎓 Acceso al Panel Docente
+    - 📁 Botón abrir/cambiar carpeta de trabajo
+  - **Menú Hamburguesa visible en Windows (☰):** Siguiendo las directrices de diseño, el botón de menú hamburguesa se encuentra visible permanentemente en el extremo derecho de la barra superior en Windows. Al pulsarlo, despliega un panel lateral deslizante (*drawer*) de 340 px con todas las opciones del sistema (estado del documento, paneles, preferencias, guardado, exportaciones y auditoría docente).
+  - **Cero duplicados en escritorio:** Los accesos directos táctiles coloreados específicos de móvil se ocultan automáticamente en pantallas de escritorio, manteniendo la cabecera despejada y profesional.
 
 - 📱 **En teléfonos móviles y pantallas estrechas ($\le$ 768px):**
-  - **Accesos directos coloreados en la cabecera:** Junto al botón de menú hamburguesa se ubican 3 accesos directos táctiles y coloreados de forma intuitiva:
-    - 🟢 **Fuentes bibliográficas** (Verde Esmeralda): Abre directamente el panel lateral con la lista de referencias científicas.
-    - 🔵 **Índice / Esquema (TOC)** (Celeste): Abre directamente la estructura jerárquica de contenidos para navegación rápida.
-    - 🔴 **Actividad y Salud** (Rosa / Coral): Abre o cierra directamente el panel de telemetría biométrica, pausas activas y métricas de escritura manual. El panel incluye su propio botón de cierre rápido (**✕**) y sincroniza su estado tanto en móvil como en escritorio.
-  - **Jerarquía visual reforzada en títulos de paneles:** Los encabezados principales de cada panel (*Fuentes*, *Índice / Esquema* y *Actividad y Salud*) cuentan con un incremento de **8 puntos más de tamaño** (`1.45rem` / ~23px) y tipografía en **negrilla** (`font-weight: 800`), permitiendo distinguirlos de inmediato frente a listas de fuentes o tarjetas de estadísticas.
-  - **Botón de Menú Hamburguesa (☰):** Al pulsar el menú hamburguesa se despliega un panel lateral suave con todas las funciones organizadas en categorías claras (guardado, preferencias, exportaciones a PDF/Word/RIS y acceso a docencia).
-  - **Paneles flotantes tipo overlay:** Los paneles de fuentes y telemetría se abren como tarjetas flotantes superpuestas para no comprimir ni desconfigurar el ancho de la hoja de redacción del documento.
-  - **Barra de formato con scroll táctil y botones compactos:** La barra de herramientas de negrita, cursiva, listas y encabezados se desplaza horizontalmente con suavidad táctil sin quebrar en múltiples filas.
+  - **Accesos directos coloreados en la cabecera:** Junto al botón de menú hamburguesa se ubican 3 accesos directos táctiles de acceso rápido:
+    - 🟢 **Fuentes bibliográficas** (Verde Esmeralda): Abre o conmuta directamente el panel lateral a la lista de referencias científicas.
+    - 🔵 **Índice / Esquema (TOC)** (Celeste): Abre o conmuta directamente a la estructura jerárquica de contenidos.
+    - 🔴 **Actividad y Salud** (Rosa / Coral): Abre o cierra directamente el panel de telemetría y salud del manuscrito.
+  - **Paneles flotantes tipo overlay:** Los paneles se abren superpuestos para no comprimir el lienzo de redacción.
+
+- 🧠 **Discriminación Inteligente de Pestañas (Fuentes vs. TOC):**
+  - Al pulsar el botón de **Fuentes**: Si el panel lateral estaba cerrado, se abre mostrando la pestaña *Fuentes*. Si ya estaba abierto pero el usuario se encontraba revisando el *Índice / TOC*, el panel **no se cierra**, sino que conmuta limpiamente a la pestaña *Fuentes*. Solo si ya está abierto en *Fuentes* y se pulsa de nuevo, se colapsa.
+  - Al pulsar el botón de **Índice (TOC)**: Si el panel estaba cerrado, se abre mostrando *Contenido / TOC*. Si ya estaba abierto en *Fuentes*, conmuta fluidamente a *TOC* sin cerrar el panel. Si ya está abierto en *TOC* y se pulsa de nuevo, se colapsa.
+  - Esto garantiza que el redactor nunca pierda el hilo ni cierre accidentalmente la barra lateral al alternar entre fuentes y contenidos.
 
 ---
 
