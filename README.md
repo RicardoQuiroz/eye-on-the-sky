@@ -320,10 +320,11 @@ Para garantizar la mejor experiencia tanto en computadoras de escritorio como en
   - **Accesos directos coloreados en la cabecera:** Junto al botón de menú hamburguesa se ubican 3 accesos directos táctiles y coloreados de forma intuitiva:
     - 🟢 **Fuentes bibliográficas** (Verde Esmeralda): Abre directamente el panel lateral con la lista de referencias científicas.
     - 🔵 **Índice / Esquema (TOC)** (Celeste): Abre directamente la estructura jerárquica de contenidos para navegación rápida.
-    - 🔴 **Actividad y Salud** (Rosa / Coral): Despliega el panel de telemetría biométrica y pausas activas.
+    - 🔴 **Actividad y Salud** (Rosa / Coral): Abre o cierra directamente el panel de telemetría biométrica, pausas activas y métricas de escritura manual. El panel incluye su propio botón de cierre rápido (**✕**) y sincroniza su estado tanto en móvil como en escritorio.
+  - **Jerarquía visual reforzada en títulos de paneles:** Los encabezados principales de cada panel (*Fuentes*, *Índice / Esquema* y *Actividad y Salud*) cuentan con un incremento de **8 puntos más de tamaño** (`1.45rem` / ~23px) y tipografía en **negrilla** (`font-weight: 800`), permitiendo distinguirlos de inmediato frente a listas de fuentes o tarjetas de estadísticas.
   - **Botón de Menú Hamburguesa (☰):** Al pulsar el menú hamburguesa se despliega un panel lateral suave con todas las funciones organizadas en categorías claras (guardado, preferencias, exportaciones a PDF/Word/RIS y acceso a docencia).
   - **Paneles flotantes tipo overlay:** Los paneles de fuentes y telemetría se abren como tarjetas flotantes superpuestas para no comprimir ni desconfigurar el ancho de la hoja de redacción del documento.
-  - **Barra de formato con scroll táctil:** La barra de herramientas de negrita, cursiva, listas y encabezados se desplaza horizontalmente con suavidad táctil sin quebrar en múltiples filas.
+  - **Barra de formato con scroll táctil y botones compactos:** La barra de herramientas de negrita, cursiva, listas y encabezados se desplaza horizontalmente con suavidad táctil sin quebrar en múltiples filas.
 
 ---
 
@@ -331,7 +332,7 @@ Para garantizar la mejor experiencia tanto en computadoras de escritorio como en
 
 Con el fin de ofrecer una experiencia completa de procesador de textos académico profesional, se incorporaron 8 nuevas funcionalidades especializadas:
 
-#### 1. Estilos Tipográficos Normativos (H1 a H5)
+#### 1. Estilos Tipográficos Normativos (H1 a H5) y Selector Optimizado
 Los niveles de encabezado aplican automáticamente un código cromático y estructural para jerarquizar el manuscrito:
 * **H1 (Título principal):** Color negro (`#1a1d23` en tema claro, adaptado en tema oscuro), sin sangría.
 * **H2 (Sección):** Color celeste (`#2196F3` en tema claro, `#64b5f6` en tema oscuro), sangría de 4 espacios (`padding-left: 4ch`).
@@ -339,7 +340,7 @@ Los niveles de encabezado aplican automáticamente un código cromático y estru
 * **H4 (Sub-apartado):** Color verde lechuga (`#7CB342`), sin sangría.
 * **H5 (Nivel de detalle):** Color lila (`#9C27B0`), sin sangría.
 * **Párrafos de texto regular:** Sangría de primera línea de 4 espacios (`text-indent: 4ch`).
-* El menú desplegable de títulos en la barra de herramientas previsualiza los nombres en español ("Normal", "Título 1" a "Título 5") junto a sus colores y sangrías reales.
+* **Selector de estilos más compacto (-10 px):** El menú desplegable de títulos en la barra de herramientas se ajustó con **10 px horizontales menos** (de 98 px a 88 px), liberando espacio para que los demás botones de edición y citas quepan holgadamente sin saturar la barra superior. Previsualiza los nombres en español ("Normal", "Título 1" a "Título 5") junto a sus colores y sangrías reales.
 
 #### 2. Herramientas de Sangría Triple (Izquierda, Derecha y Ambas)
 En la fila de herramientas de formato se integraron 3 botones de sangría:

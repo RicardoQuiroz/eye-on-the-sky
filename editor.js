@@ -91,7 +91,7 @@ const App = {
   // Flags de UI
   ui: {
     sourcesPanelOpen: true,
-    telePanelOpen:    true,
+    telePanelOpen:    false,
     isDirty:          false,  // hay cambios sin guardar
     currentTheme:     'light',
     projectLoaded:    false,
@@ -2276,17 +2276,20 @@ function initEventListeners() {
   }
   window.openTocPanel = openTocPanel;
 
-  function toggleTelemetryPanel() {
+  function toggleTelemetryPanel(forceOpen) {
     const sidebar = document.getElementById('sidebar-telemetry');
     if (!sidebar) return;
-    App.ui.telePanelOpen = !App.ui.telePanelOpen;
-    sidebar.classList.toggle('collapsed', !App.ui.telePanelOpen);
-    if (App.ui.telePanelOpen && window.innerWidth <= 900) {
+    const isCurrentlyOpen = !sidebar.classList.contains('collapsed');
+    const shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : !isCurrentlyOpen;
+    App.ui.telePanelOpen = shouldOpen;
+    sidebar.classList.toggle('collapsed', !shouldOpen);
+    if (shouldOpen && window.innerWidth <= 900) {
       const src = document.getElementById('sidebar-sources');
       App.ui.sourcesPanelOpen = false;
       if (src) src.classList.add('collapsed');
     }
     updatePanelBackdrop();
+    if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
   }
   window.toggleTelemetryPanel = toggleTelemetryPanel;
 
@@ -2303,21 +2306,50 @@ function initEventListeners() {
         if (tele) tele.classList.add('collapsed');
       }
       updatePanelBackdrop();
+      if (typeof updateMobileMenuUI === 'function') updateMobileMenuUI();
     });
   }
 
   const btnToggleTele = document.getElementById('btn-toggle-tele');
   if (btnToggleTele) {
-    btnToggleTele.addEventListener('click', toggleTelemetryPanel);
+    btnToggleTele.addEventListener('click', () => toggleTelemetryPanel());
   }
 
   // Atajos coloreados superiores junto al menú hamburguesa
   const btnNavSources = document.getElementById('btn-nav-sources');
-  if (btnNavSources) btnNavSources.addEventListener('click', openSourcesPanel);
+  if (btnNavSources) {
+    btnNavSources.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSourcesPanel();
+    });
+  }
   const btnNavToc = document.getElementById('btn-nav-toc');
-  if (btnNavToc) btnNavToc.addEventListener('click', openTocPanel);
+  if (btnNavToc) {
+    btnNavToc.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTocPanel();
+    });
+  }
   const btnNavTele = document.getElementById('btn-nav-tele');
-  if (btnNavTele) btnNavTele.addEventListener('click', toggleTelemetryPanel);
+  if (btnNavTele) {
+    btnNavTele.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTelemetryPanel();
+    });
+  }
+
+  // Botón cerrar en la cabecera del panel de telemetría
+  const btnCloseTele = document.getElementById('btn-close-tele');
+  if (btnCloseTele) {
+    btnCloseTele.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTelemetryPanel(false);
+    });
+  }
 
   // Tema
   document.getElementById('btn-theme').addEventListener('click', () => {
@@ -2696,16 +2728,7 @@ function initMobileMenu() {
   const mobTele = document.getElementById('mob-btn-toggle-tele');
   if (mobTele) {
     mobTele.addEventListener('click', () => {
-      const sidebar = document.getElementById('sidebar-telemetry');
-      App.ui.telePanelOpen = !App.ui.telePanelOpen;
-      if (sidebar) sidebar.classList.toggle('collapsed', !App.ui.telePanelOpen);
-      if (App.ui.telePanelOpen && window.innerWidth <= 900) {
-        const sources = document.getElementById('sidebar-sources');
-        App.ui.sourcesPanelOpen = false;
-        if (sources) sources.classList.add('collapsed');
-      }
-      updatePanelBackdrop();
-      updateMobileMenuUI();
+      toggleTelemetryPanel();
       closeMobileMenu();
     });
   }

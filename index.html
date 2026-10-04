@@ -15,7 +15,7 @@
   <!-- Quill editor -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
   <!-- Estilos de la aplicación -->
-  <link rel="stylesheet" href="styles.css?v=1.4" />
+  <link rel="stylesheet" href="styles.css?v=1.6" />
 </head>
 <body>
 
@@ -111,13 +111,13 @@
 
     <!-- Accesos directos coloreados para Fuentes, TOC y Salud/Actividad -->
     <div class="header-nav-shortcuts" id="header-nav-shortcuts">
-      <button type="button" class="btn-nav-shortcut nav-shortcut-sources" id="btn-nav-sources" title="Panel de Fuentes bibliográficas" aria-label="Abrir panel de fuentes" onclick="openSourcesPanel()">
+      <button type="button" class="btn-nav-shortcut nav-shortcut-sources" id="btn-nav-sources" title="Panel de Fuentes bibliográficas" aria-label="Abrir panel de fuentes">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
       </button>
-      <button type="button" class="btn-nav-shortcut nav-shortcut-toc" id="btn-nav-toc" title="Índice / Tabla de Contenidos (TOC)" aria-label="Abrir índice TOC" onclick="openTocPanel()">
+      <button type="button" class="btn-nav-shortcut nav-shortcut-toc" id="btn-nav-toc" title="Índice / Tabla de Contenidos (TOC)" aria-label="Abrir índice TOC">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="8" y1="6" x2="21" y2="6"/>
           <line x1="8" y1="12" x2="21" y2="12"/>
@@ -127,7 +127,7 @@
           <line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
       </button>
-      <button type="button" class="btn-nav-shortcut nav-shortcut-tele" id="btn-nav-tele" title="Panel de Actividad y Salud (Telemetría)" aria-label="Abrir panel de actividad y salud" onclick="toggleTelemetryPanel()">
+      <button type="button" class="btn-nav-shortcut nav-shortcut-tele" id="btn-nav-tele" title="Panel de Actividad y Salud (Telemetría)" aria-label="Abrir panel de actividad y salud">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
         </svg>
@@ -437,7 +437,7 @@
       <!-- Vista 1: Fuentes bibliográficas -->
       <div class="sidebar-panel-view" id="view-sources">
         <div class="sidebar-header">
-          <span>Fuentes</span>
+          <span class="sidebar-title">Fuentes</span>
           <div style="display: flex; gap: 4px;">
             <button class="btn btn-ghost btn-sm btn-icon" id="btn-add-source" title="Agregar nueva fuente">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -454,7 +454,7 @@
       <!-- Vista 2: Tabla de Contenidos / Estructura -->
       <div class="sidebar-panel-view hidden" id="view-toc">
         <div class="sidebar-header" style="flex-wrap: wrap; gap: 8px;">
-          <span>Índice / Esquema</span>
+          <span class="sidebar-title">Índice / Esquema</span>
           <div style="display: flex; gap: 6px; align-items: center;">
             <button class="btn btn-ghost btn-sm btn-icon" id="btn-refresh-toc" title="Actualizar índice">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -483,9 +483,12 @@
     </main>
 
     <!-- Sidebar de actividad (derecha) -->
-    <aside id="sidebar-telemetry">
+    <aside id="sidebar-telemetry" class="collapsed">
       <div class="sidebar-header">
-        <span>Actividad</span>
+        <span class="sidebar-title">Actividad y Salud</span>
+        <button class="btn btn-ghost btn-sm btn-icon" id="btn-close-tele" title="Cerrar panel" aria-label="Cerrar panel de actividad y salud">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
 
       <!-- Salud del manuscrito -->
@@ -1006,7 +1009,7 @@
 <!-- JSZip -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Lógica principal -->
-<script src="editor.js?v=1.4"></script>
+<script src="editor.js?v=1.6"></script>
 
 <!-- Registro de Service Worker para soporte Offline / PWA -->
 <script>

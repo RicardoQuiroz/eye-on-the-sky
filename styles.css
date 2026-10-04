@@ -290,17 +290,32 @@ body {
 #sidebar-sources.collapsed { width: 0; }
 
 .sidebar-header {
-  padding: 14px 16px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  gap: 10px;
+}
+
+/* Títulos principales de los paneles: +8 puntos de tamaño (1.45rem / ~23px) y negrilla */
+.sidebar-header .sidebar-title,
+.sidebar-header > span:first-child,
+.sidebar-header h2,
+.sidebar-header h3 {
+  font-size: 1.45rem !important;
+  font-weight: 800 !important;
+  color: var(--text-primary) !important;
+  letter-spacing: -0.02em;
+  text-transform: none !important;
+  line-height: 1.25;
+}
+
+/* Preservar tamaño compacto de botones dentro de la cabecera */
+.sidebar-header .btn span {
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
 }
 
 .sidebar-content {
@@ -1614,6 +1629,15 @@ body {
 /* ============================================================
    NUEVAS FUNCIONALIDADES: TOC, TABLAS, SANGRÍAS, PÁGINAS
    ============================================================ */
+
+/* ---- Botón y selector de estilos de encabezados en Quill (reducido en 10px horizontales: 98px -> 88px) ---- */
+.ql-snow .ql-picker.ql-header {
+  width: 88px !important;
+}
+.ql-snow .ql-picker.ql-header .ql-picker-label {
+  padding-left: 4px !important;
+  padding-right: 16px !important;
+}
 
 /* ---- Colores y etiquetas de encabezados en el selector de Quill ---- */
 .ql-snow .ql-picker.ql-header .ql-picker-label::before,
