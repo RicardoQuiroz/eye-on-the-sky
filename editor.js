@@ -478,7 +478,58 @@ function initQuill() {
       toolbar: '#quill-toolbar',
     },
     placeholder: 'Comienza a escribir tu documento de investigación aquí…',
+    scrollingContainer: '#editor-area',
   });
+
+  // Evitar saltos de navegación (scroll al inicio del documento) al aplicar estilos o reenfocar el editor
+  const editorArea = document.getElementById('editor-area');
+  const qlEditor = App.quill.root;
+  if (qlEditor && editorArea) {
+    const origFocus = qlEditor.focus.bind(qlEditor);
+    qlEditor.focus = function(options) {
+      const prevScroll = editorArea.scrollTop;
+      origFocus(options || { preventScroll: true });
+      if (prevScroll > 0 && editorArea.scrollTop === 0) {
+        editorArea.scrollTop = prevScroll;
+      }
+    };
+  }
+
+  // Preservar la posición exacta de scroll al interactuar con la barra de herramientas (ej. selector de títulos)
+  const quillToolbar = document.getElementById('quill-toolbar');
+  if (quillToolbar && editorArea) {
+    let toolbarScrollSnapshot = 0;
+
+    const captureScroll = () => {
+      if (editorArea.scrollTop > 0) {
+        toolbarScrollSnapshot = editorArea.scrollTop;
+      }
+    };
+
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(evt => {
+      quillToolbar.addEventListener(evt, captureScroll, { capture: true, passive: true });
+    });
+
+    const restoreScroll = () => {
+      if (toolbarScrollSnapshot > 0) {
+        const target = toolbarScrollSnapshot;
+        requestAnimationFrame(() => {
+          if (editorArea.scrollTop === 0 && target > 0) {
+            editorArea.scrollTop = target;
+          }
+        });
+        setTimeout(() => {
+          if (editorArea.scrollTop === 0 && target > 0) {
+            editorArea.scrollTop = target;
+          }
+          toolbarScrollSnapshot = 0;
+        }, 50);
+      }
+    };
+
+    quillToolbar.addEventListener('click', restoreScroll, { capture: true });
+    quillToolbar.addEventListener('change', restoreScroll, { capture: true });
+  }
 
   // Telemetría: detectar texto tecleado vs pegado
   App.quill.on('text-change', (delta, oldDelta, source) => {
