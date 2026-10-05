@@ -322,8 +322,8 @@ Para garantizar la mejor experiencia adaptada tanto a computadoras de escritorio
     - 💾 Guardar ahora (con estadísticas)
     - 📦 Menú de exportación (PDF, Word, RIS, JSON)
     - 🎓 Acceso al Panel Docente
-    - 📁 Botón abrir/cambiar carpeta de trabajo
-  - **Menú Hamburguesa visible en Windows (☰):** Siguiendo las directrices de diseño, el botón de menú hamburguesa se encuentra visible permanentemente en el extremo derecho de la barra superior en Windows. Al pulsarlo, despliega un panel lateral deslizante (*drawer*) de 340 px con todas las opciones del sistema (estado del documento, paneles, preferencias, guardado, exportaciones y auditoría docente).
+    - 📁 **Botón de carpeta (`#btn-open-folder`):** Muestra de forma permanente el **nombre de la carpeta elegida** por el usuario para su proyecto (por ejemplo `MiCarpetaTesis`), nunca el nombre técnico del archivo JSON abierto. Si no hay carpeta enlazada, invita a *"Abrir / Crear carpeta"* o *"Vincular carpeta"*.
+  - **Menú Hamburguesa visible en Windows (☰) con títulos destacados:** Siguiendo las directrices de diseño, el botón de menú hamburguesa se encuentra visible permanentemente en el extremo derecho de la barra superior en Windows. Al pulsarlo, despliega un panel lateral deslizante (*drawer*) de 340 px con todas las opciones del sistema. Los títulos de cada sección (**"VISTAS Y PANELES"**, **"PREFERENCIAS"**, **"ARCHIVO Y GUARDADO"**, **"EXPORTAR MANUSCRITO"** y **"DOCENCIA"**) cuentan con el **doble de tamaño** (`1.44rem`) y tipografía en **negrilla intensa** (`font-weight: 800`) con alto contraste, haciéndolos inmediatamente notorios y legibles tanto en modo claro como en modo oscuro.
   - **Cero duplicados en escritorio:** Los accesos directos táctiles coloreados específicos de móvil se ocultan automáticamente en pantallas de escritorio, manteniendo la cabecera despejada y profesional.
 
 - 📱 **En teléfonos móviles y pantallas estrechas ($\le$ 768px):**

@@ -782,22 +782,44 @@ function updateTelemetryUI() {
    GESTIÓN DEL PROYECTO (File System Access API y Almacenamiento Local)
    ================================================================ */
 
+function updateFolderButtonUI() {
+  const folderLabel = document.getElementById('open-folder-label');
+  const folderBtn = document.getElementById('btn-open-folder');
+  if (!folderLabel) return;
+
+  if (App.dirHandle && App.dirHandle.name) {
+    folderLabel.textContent = App.dirHandle.name;
+    if (folderBtn) folderBtn.title = `Carpeta elegida: ${App.dirHandle.name} (Haz clic para cambiar)`;
+  } else {
+    const lastFolder = localStorage.getItem('eots-last-folder-name');
+    if (lastFolder && 'showDirectoryPicker' in window) {
+      folderLabel.textContent = lastFolder;
+      if (folderBtn) folderBtn.title = `Carpeta elegida: ${lastFolder} (Haz clic para volver a vincular)`;
+    } else if ('showDirectoryPicker' in window) {
+      folderLabel.textContent = 'Abrir / Crear carpeta';
+      if (folderBtn) folderBtn.title = 'Seleccionar carpeta de trabajo para autoguardado';
+    } else {
+      folderLabel.textContent = 'Guardado local';
+      if (folderBtn) folderBtn.title = 'Autoguardado en almacenamiento local del dispositivo';
+    }
+  }
+}
+
 function adaptUIForPlatform() {
   const hasFSA = 'showDirectoryPicker' in window;
   const onboardOpen = document.getElementById('onboard-open');
   const onboardNewText = document.getElementById('onboard-new-text');
-  const folderLabel = document.getElementById('open-folder-label');
   const mobileNotice = document.getElementById('onboard-mobile-notice');
 
   if (!hasFSA) {
     if (onboardNewText) onboardNewText.textContent = 'Crear nuevo documento';
     if (onboardOpen) onboardOpen.style.display = 'none';
-    if (folderLabel) folderLabel.textContent = 'Guardado local';
     if (mobileNotice) mobileNotice.style.display = 'block';
   } else {
     if (onboardNewText) onboardNewText.textContent = 'Crear nuevo documento (en carpeta)';
     if (onboardOpen) onboardOpen.style.display = 'flex';
   }
+  updateFolderButtonUI();
 
   // En pantallas móviles / tablets estrechas, colapsar paneles laterales al inicio para maximizar el área de escritura
   if (window.innerWidth <= 768) {
@@ -829,6 +851,8 @@ async function openOrCreateProject(mode) {
   try {
     const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     App.dirHandle = dirHandle;
+    App.folderName = dirHandle.name;
+    localStorage.setItem('eots-last-folder-name', dirHandle.name);
 
     // Crear o abrir subcarpeta capturas/
     App.capturasHandle = await dirHandle.getDirectoryHandle('capturas', { create: true });
@@ -847,7 +871,7 @@ async function openOrCreateProject(mode) {
     const sbProj = document.getElementById('sb-project-name');
     if (sbProj) sbProj.textContent = dirHandle.name;
     updatePageMetrics();
-    document.getElementById('open-folder-label').textContent = 'Cambiar carpeta';
+    updateFolderButtonUI();
 
     // Iniciar autoguardado (cada 15 segundos)
     startAutosave();
@@ -887,8 +911,7 @@ async function createNewProjectDirectly() {
 
   const sbName = document.getElementById('sb-project-name');
   if (sbName) sbName.textContent = 'Documento nuevo (Local)';
-  const folderLabel = document.getElementById('open-folder-label');
-  if (folderLabel) folderLabel.textContent = 'Almacenamiento local';
+  updateFolderButtonUI();
 
   startAutosave();
   SoundFx.play('session_start');
@@ -1149,8 +1172,8 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
 
   const sbName = document.getElementById('sb-project-name');
   if (sbName) sbName.textContent = sourceName;
-  const folderLabel = document.getElementById('open-folder-label');
-  if (folderLabel) folderLabel.textContent = sourceName.slice(0, 16) + '…';
+  // El botón con el ícono de carpeta muestra siempre el nombre de la carpeta elegida, nunca el archivo JSON
+  updateFolderButtonUI();
 
   // Iniciar autoguardado periódico para que la sesión mantenga guardado automático (móvil y PC)
   startAutosave();
