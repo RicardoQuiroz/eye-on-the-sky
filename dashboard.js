@@ -871,6 +871,7 @@ const Live = {
     } catch (e) { err.textContent = 'No se pudo conectar: ' + e.message; return; }
     try { localStorage.setItem('eots-live-url', url); localStorage.setItem('eots-teacher-key', key); } catch (_) {}
     hideModal(document.getElementById('modal-live'));
+    showToast('✓ Conectado al registro del curso.', 'success');
     this.start();
   },
   disconnect() {
@@ -893,7 +894,11 @@ const Live = {
   async refresh() {
     try {
       const r = await this.post({ action: 'docente_resumen', teacher_key: this.key });
-      if (!r.ok) { this.lastError = r.error; this.connected = false; this.renderIndicator(); return; }
+      if (!r.ok) {
+        this.lastError = r.error; this.connected = false; this.renderIndicator();
+        showToast('Registro en vivo: ' + (r.error || 'error del servidor') + ' Pulsa "En vivo" para revisar la clave.', 'error');
+        return;
+      }
       this.connected = true; this.lastError = null; this.lastAt = new Date();
       const prev = new Map(Dash.students.filter(s => s._live).map(s => [s._key, s]));
       const live = (r.students || []).filter(x => x.metrics).map(x => {
@@ -916,6 +921,7 @@ const Live = {
       refreshAllViews();
     } catch (e) {
       this.lastError = e.message; this.connected = false; this.renderIndicator();
+      showToast('Registro en vivo: no se pudo conectar (' + e.message + ').', 'error');
     }
   },
   renderIndicator() {
@@ -942,9 +948,20 @@ const Live = {
       banner.querySelectorAll('[data-live-open]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openDetail(a.getAttribute('data-live-open')); }));
     }
     if (inactive) {
+      // Estado de la conexión SIEMPRE visible (aunque todavía no haya sesiones registradas)
       const sin = r.sin_actividad || [];
-      inactive.classList.toggle('hidden', sin.length === 0);
-      inactive.textContent = sin.length ? `Sin actividad registrada (${sin.length}): ${sin.map(x => x.nombre).join(', ')}` : '';
+      const con = (r.students || []).filter(x => x.metrics).length;
+      const total = con + sin.length;
+      inactive.classList.remove('hidden');
+      inactive.innerHTML = `
+        <div style="padding: 12px 16px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border);">
+          <div style="font-weight: 700; color: var(--success); margin-bottom: 4px;">● Conectado al registro del curso · ${this.lastAt.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })} (se actualiza solo cada ${(window.EOTS_CONFIG && EOTS_CONFIG.POLL_TEACHER_S) || 60} s)</div>
+          <div class="text-sm">${total === 0
+            ? '⚠ La hoja "Estudiantes" está vacía o sin estudiantes activos. Pega tu lista (Carnet, Estudiante, Correo) y genera las contraseñas.'
+            : `${total} estudiante(s) en la lista · <strong>${con}</strong> con sesiones registradas · <strong>${sin.length}</strong> sin actividad todavía.`}</div>
+          ${con === 0 && total > 0 ? '<div class="text-sm text-muted" style="margin-top: 4px;">La tabla y los gráficos aparecerán cuando el primer estudiante inicie sesión en el editor y trabaje (su sesión se envía en menos de un minuto).</div>' : ''}
+          ${sin.length ? `<div class="text-sm text-muted" style="margin-top: 4px;">Sin actividad: ${sin.map(x => escapeHtml(x.nombre)).join(', ')}</div>` : ''}
+        </div>`;
     }
   },
   async loadDetail(student) {
