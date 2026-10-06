@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Estado-Activo-2ea44f?style=for-the-badge&logo=github" alt="Estado">
   <img src="https://img.shields.io/badge/Tecnolog%C3%ADa-Vanilla_JS_%7C_HTML5_%7C_CSS3-orange?style=for-the-badge&logo=javascript" alt="Tecnología">
   <img src="https://img.shields.io/badge/Almacenamiento-Local--First_%7C_Zero--Backend-blue?style=for-the-badge&logo=json" alt="Local First">
-  <img src="https://img.shields.io/badge/Biometr%C3%ADa-Keystroke_Dynamics-purple?style=for-the-badge&logo=fingerprint" alt="Biometría">
+  <img src="https://img.shields.io/badge/Telemetr%C3%ADa-Procedencia_%2B_Proceso-purple?style=for-the-badge&logo=fingerprint" alt="Biometría">
   <img src="https://img.shields.io/badge/Emails-Google_Apps_Script_%7C_Zero--SMTP-red?style=for-the-badge&logo=gmail" alt="Google Apps Script">
   <img src="https://img.shields.io/badge/Seguridad-Firma_SHA--256-blueviolet?style=for-the-badge&logo=auth0" alt="Seguridad">
   <img src="https://img.shields.io/badge/Compatibilidad-Zotero_%7C_BibTeX_%7C_Word-success?style=for-the-badge&logo=zotero" alt="Zotero">
@@ -14,78 +14,53 @@
 
 ---
 
+
 ## 🧭 Tabla de Contenidos
 
 - [🎯 1. ¿Qué es Eye on the Sky?](#-1-qué-es-eye-on-the-sky)
-  - [💡 La Filosofía del Proyecto](#-la-filosofía-del-proyecto)
 - [✨ 2. Características Principales](#-2-características-principales)
 - [🔄 3. Flujo de Trabajo General](#-3-flujo-de-trabajo-general)
 - [🚀 4. Instalación y Puesta en Marcha](#-4-instalación-y-puesta-en-marcha)
 - [🎓 5. Manual del Estudiante (Editor)](#-5-manual-del-estudiante-editor)
-  - [📁 5.1. Abrir o Crear Carpeta / Archivo de Trabajo](#-51-abrir-o-crear-carpeta--archivo-de-trabajo)
-  - [✍️ 5.2. Redacción y Telemetría en Vivo](#️-52-redacción-y-telemetría-en-vivo)
-  - [🎨 5.3. Mapa de Colores de Procedencia del Texto (Auditoría Visual)](#-53-mapa-de-colores-de-procedencia-del-texto-auditoría-visual)
-  - [🔒 5.4. Biometría de Escritura (Huella Digital de Tecleo)](#-54-biometría-de-escritura-huella-digital-de-tecleo)
-  - [📋 5.5. Gestión del Pegado Inicial Masivo](#-55-gestión-del-pegado-inicial-masivo)
-  - [🔊 5.6. Gamificación y Efectos de Sonido](#-56-gamificación-y-efectos-de-sonido)
-  - [📚 5.7. Registro de Fuentes y Citación Científica](#-57-registro-de-fuentes-y-citación-científica)
-  - [📸 5.8. Inserción de Capturas de Evidencia (PDFs)](#-58-inserción-de-capturas-de-evidencia-pdfs)
-  - [💾 5.9. Autoguardado e Integridad Criptográfica Local](#-59-autoguardado-e-integridad-criptográfica-local)
-  - [📦 5.10. Exportaciones para la Entrega](#-510-exportaciones-para-la-entrega)
-  - [📱 5.11. Modo Móvil y Menú Hamburguesa Autoexplicativo](#-511-modo-móvil-y-menú-hamburguesa-autoexplicativo)
-  - [📐 5.12. Nuevas Herramientas de Formato y Estructura Académica](#-512-nuevas-herramientas-de-formato-y-estructura-académica)
 - [👨‍🏫 6. Manual del Docente (Dashboard de Auditoría)](#-6-manual-del-docente-dashboard-de-auditoría)
-  - [📥 6.1. Carga Masiva de Trabajos (.JSON)](#-61-carga-masiva-de-trabajos-json)
-  - [📊 6.2. Vista General y Métricas del Curso](#-62-vista-general-y-métricas-del-curso)
-  - [📈 6.3. Auditoría del Proceso Incremental (Sesión a Sesión)](#-63-auditoría-del-proceso-incremental-sesión-a-sesión)
-  - [🎯 6.4. Auditoría Biométrica y Detección de Suplantación de Autor](#-64-auditoría-biométrica-y-detección-de-suplantación-de-autor)
-  - [🚨 6.5. Sistema Inteligente de Alertas](#-65-sistema-inteligente-de-alertas)
-  - [📑 6.6. Exportación a Excel / Google Sheets (CSV)](#-66-exportación-a-excel--google-sheets-csv)
-  - [📧 6.7. Envío Masivo de Reportes Gráficos por Correo (Google Sheets + Apps Script)](#-67-envío-masivo-de-reportes-gráficos-por-correo-google-sheets--apps-script)
-  - [🧪 6.8. Banco de Pruebas: Estudiantes Demo](#-68-banco-de-pruebas-estudiantes-demo)
-- [🛡️ 7. Seguridad y Criptografía (Anti-Manipulación)](#️-7-seguridad-y-criptografía-anti-manipulación)
-- [📂 8. Estructura de Archivos del Repositorio](#-8-estructura-de-archivos-del-repositorio)
-- [🌐 9. Requisitos y Compatibilidad de Navegadores](#-9-requisitos-y-compatibilidad-de-navegadores)
-- [🤝 10. Contribuciones y Soporte](#-10-contribuciones-y-soporte)
+- [☁️ 6bis. Registro del curso en Google Sheets (en vivo)](#️-6bis-registro-del-curso-en-google-sheets-en-vivo)
+- [🧪 7. ¿Qué puede y qué no puede demostrar la telemetría?](#-7-qué-puede-y-qué-no-puede-demostrar-la-telemetría)
+- [🛡️ 8. Integridad y Criptografía](#️-8-integridad-y-criptografía)
+- [📂 9. Estructura de Archivos del Repositorio](#-9-estructura-de-archivos-del-repositorio)
+- [🌐 10. Requisitos y Compatibilidad](#-10-requisitos-y-compatibilidad)
 
 ---
 
 ## 🎯 1. ¿Qué es Eye on the Sky?
 
-**Eye on the Sky** (*Ojo en el Cielo*) es un entorno de trabajo académico ligero, moderno y autónomo diseñado especialmente para cursos de investigación, seminarios de tesis y talleres de grado.
+**Eye on the Sky** (*Ojo en el Cielo*) es un entorno de escritura académica ligero y autónomo para cursos de investigación, seminarios de tesis y talleres de grado. Funciona sin servidor: el estudiante trabaja en su navegador (PC o celular) y el docente analiza las entregas arrastrando los archivos al panel docente.
 
-Resuelve de raíz los dos mayores dilemas de la docencia universitaria contemporánea:
-1. 🔍 **Verificar el trabajo genuino de construcción e incremento:** Comprobar si un estudiante redactó su manuscrito a lo largo de días y semanas mediante pulsaciones reales en el teclado, o si generó/pegó el documento completo de golpe mediante Inteligencia Artificial (ChatGPT, Claude, etc.) la noche anterior a la entrega.
-2. 📖 **Asegurar el rigor científico de las fuentes:** Verificar que las citas bibliográficas no son referencias inventadas o alucinadas por LLMs, exigiendo al estudiante la captura obligatoria de la página del PDF científico donde se sustenta el párrafo citado.
-3. 🎯 **Certificar la autoría continua mediante biometría de tecleo:** Medir los micro-ritmos de pulsación del estudiante (*dwell time* y *flight time*) para constatar que siempre es la misma persona quien redacta sesión a sesión y alertar si otra persona o servicio de terceros redactó partes del documento.
-
-### 💡 La Filosofía del Proyecto
+Persigue tres objetivos:
+1. 🔍 **Hacer visible el proceso de escritura:** cuánto del texto final fue tecleado en el editor, cuánto se pegó, en cuántas sesiones, días y dispositivos se construyó, y cómo se corrigió.
+2. 📖 **Asegurar el respaldo de las fuentes:** cada fuente puede llevar la captura de la página del PDF consultado, con una huella SHA-256 que permite al docente comprobar que la imagen entregada es la misma que se adjuntó.
+3. 🤝 **Fomentar la honestidad declarada:** en lugar de castigar todo pegado, el estudiante puede declarar lo que pega (notas propias, cita textual, texto con IA). Lo declarado no se penaliza, pero el docente lo ve y tiene un presupuesto.
 
 > [!NOTE]
-> **Diseñado para la realidad docente latinoamericana:** 
-> 🚫 **Sin bases de datos en la nube ni costos mensuales recurrentes.**  
-> 🚫 **Sin servidores SMTP complejos que caigan en carpetas de Spam.**  
-> 💾 **100% Local-First:** El estudiante guarda todo en una carpeta de su propia computadora. El docente analiza el curso completo en segundos simplemente arrastrando los archivos `.json` al dashboard.  
-> 📧 **Integración nativa con Google Sheets y Google Apps Script:** Permite enviar correos masivos con diseño gráfico profesional usando directamente la cuota gratuita de Gmail/Google Workspace institucional.
+> **Local-first:** sin base de datos, sin costos mensuales. El trabajo se guarda en el navegador del estudiante (y, en PC, opcionalmente en una carpeta). Para cambiar de dispositivo o entregar se usa un **paquete .zip** que contiene el documento y todas sus capturas.
 
 ---
 
 ## ✨ 2. Características Principales
 
-| Módulo | Icono | Funcionalidad Destacada |
-| :--- | :---: | :--- |
-| **Editor** | 📝 | **Editor enriquecido limpio y libre de distracciones** con tipografía moderna sin serifa, modo oscuro/claro y atajos directos. |
-| **Mapa de Colores** | 🎨 | **Codificación visual de procedencia del texto:** Resalta con la paleta del dashboard el texto pegado externo (rojo), pegado inicial exento (azul) y citas científicas (púrpura), con botón de ocultar para lectura limpia. |
-| **Biometría de Escritura** | 🔒 | **Dinámica de tecleo (Keystroke Dynamics):** Mide permanencia en tecla (*dwell time*) y pausas de vuelo (*flight time*). Calibra una huella digital a las 250 pulsaciones y evalúa la consistencia de autoría sesión tras sesión. |
-| **Gamificación Sonora** | 🔊 | **Efectos de audio:** Feedback sonoro sutil al teclear, pegar texto, insertar citas, calibrar la huella y alcanzar hitos de palabras. |
-| **Telemetría** | ⏱️ | **Medición en tiempo real** de palabras tecleadas, pulsaciones, eventos de pegado y tiempo activo. |
-| **Historial** | 📅 | **Bitácora incremental de sesiones:** Cada día de trabajo queda asentado con fecha, hora, duración y avance neto de palabras. |
-| **Bibliografía** | 🏷️ | **Importador DOI (Crossref) y BibTeX** (individual y en lote) con estilos **Chicago** y **APA**. |
-| **Evidencia** | 🖼️ | **Capturas de pantalla vinculadas localmente**, sin engordar el JSON con cadenas pesadas en base64. |
-| **Dashboard** | 📊 | **Procesamiento en lote:** Carga 10, 50 o 100 archivos JSON simultáneamente y visualiza estadísticas consolidadas. |
-| **Alertas** | 🚨 | **Detección automática** de saltos atípicos de palabras, redacción en una sola sesión, discrepancia biométrica y manipulación externa. |
-| **Correo Masivo Gráfico** | 📧 | **Google Apps Script incluido (`codigo_apps_script.gs`):** Envío masivo automatizado desde Google Sheets de tarjetas de progreso HTML responsivas a cada alumno sin servidor SMTP. |
-| **Exportación** | 📄 | Compatible con **Microsoft Word (.docx)**, **PDF**, **Zotero (.ris)** y reportes para **Excel / Google Sheets (.csv)**. |
+| Módulo | Funcionalidad |
+| :--- | :--- |
+| 📝 **Editor** | Editor enriquecido (Quill 1.3.7) con títulos H1–H5, sangrías, listas, tablas, índice (TOC), bibliografía, modo claro/oscuro y paginación visual. |
+| 🎨 **Procedencia del texto** | Cada fragmento lleva un color de origen: tecleado (sin color), notas propias, cita textual, IA declarada, pegado sin declarar y referencia bibliográfica. "Limpiar formato" **no** borra estos colores. |
+| 📋 **Pegados declarados** | Todo pegado de 12 palabras o más (en cualquier momento) abre una ventana para declararlo. Cortar y pegar dentro del propio documento se reconoce como reubicación y no cuenta como pegado. |
+| 📊 **Panel acumulado** | "Actividad y Salud" muestra las cifras de **todas las sesiones en todos los dispositivos** y la lista exacta de observaciones que verá el docente. |
+| ✍️ **Proceso de escritura** | Tasa de revisión, ediciones no lineales, pausas de reflexión y tiempo de tecleo efectivo por sesión, más una línea de tiempo del crecimiento del documento. |
+| 🔒 **Ritmo de tecleo** | Huella de permanencia/vuelo de teclas, **solo con teclado físico** y por sesión. Es informativa, no una prueba de identidad. |
+| 📸 **Capturas portables** | Imágenes guardadas en el almacén del navegador (IndexedDB) y en `capturas/` si hay carpeta; se insertan como imagen real en el documento y viajan dentro del paquete .zip con su huella SHA-256. |
+| 📦 **Paquete .zip** | Documento + capturas en un solo archivo, para cambiar de dispositivo y para entregar. |
+| 🏷️ **Bibliografía** | DOI (Crossref) y BibTeX; citas y bibliografía en Chicago (notas), Chicago (autor-fecha), APA 7 y MLA 9. |
+| 📊 **Dashboard** | Carga en lote de .zip/.json, verificación de capturas y firma, gráficos de procedencia y crecimiento, detalle de pegados con fragmento, exportación CSV. |
+| 📧 **Correo masivo** | `codigo_apps_script.gs`: importa el CSV en Google Sheets y envía a cada estudiante su reporte gráfico usando tu lista oficial de correos. |
+| 📄 **Exportación** | PDF (impresión), Word (.docx con imágenes y tablas), Zotero (.ris), paquete .zip y .json. |
 
 ---
 
@@ -93,56 +68,30 @@ Resuelve de raíz los dos mayores dilemas de la docencia universitaria contempor
 
 ```mermaid
 flowchart TD
-    subgraph S1["🎓 FASE 1: TRABAJO DEL ESTUDIANTE (index.html)"]
+    subgraph S1["🎓 ESTUDIANTE (index.html, PC o celular)"]
         direction TB
-        A["📁 1. Abre index.html y elige carpeta local o .json"] --> B["✍️ 2. Redacción incremental en el editor"]
-        B --> C["🔒 3. Calibración biométrica de tecleo (250 pulsaciones)"]
-        C --> D["🎨 4. Mapa de colores visualiza procedencia (escritura vs pegado)"]
-        D --> E["📚 5. Registra fuentes (DOI / BibTeX) + Captura PDF"]
-        E --> F["💾 6. Autoguardado cada 30s en documento.json con firma SHA-256"]
-        F --> G["📦 7. Exporta y entrega: documento.json + PDF académico"]
+        A["📁 Crea o abre el proyecto (.zip / .json / carpeta)"] --> B["✍️ Redacta; declara lo que pega"]
+        B --> C["📚 Registra fuentes + captura del PDF"]
+        C --> D["📊 Revisa su panel acumulado (lo mismo que verá el docente)"]
+        D --> E["📦 Descarga el paquete .zip"]
+        E -->|"Otro dispositivo"| A
     end
-
-    subgraph S2["👨‍🏫 FASE 2: AUDITORÍA DOCENTE (dashboard.html)"]
+    subgraph S2["👨‍🏫 DOCENTE (dashboard.html)"]
         direction TB
-        H["📥 8. Docente abre dashboard.html y arrastra lote de .json"] --> I["📊 9. Vista global del curso, gráficos y biometría"]
-        I --> J["🔍 10. Inspección de alertas, autoría y sesiones"]
-        J --> K["📑 11. Exporta reporte consolidado CSV"]
+        H["📥 Arrastra los .zip del curso"] --> I["🔍 Verifica capturas, firma, procedencia y proceso"]
+        I --> K["📑 Exporta CSV"]
     end
-
-    subgraph S3["📧 FASE 3: RETROALIMENTACIÓN MASIVA (Google Sheets + Apps Script)"]
+    subgraph S3["📧 GOOGLE SHEETS + APPS SCRIPT"]
         direction TB
-        L["📋 12. Fusiona CSV con Google Sheets existente del profesor"] --> M["⚙️ 13. Pega codigo_apps_script.gs en Extensiones > Apps Script"]
-        M --> N["🚀 14. Menú '🎓 Eye on the Sky' > Envío masivo por Gmail"]
-        N --> O["📬 15. Estudiante recibe correo gráfico con tarjeta HTML de métricas"]
+        L["📋 Hoja Estudiantes: lista oficial de correos"] --> M["📥 Importa CSV → hoja Reporte"]
+        M --> N["🚀 Envía reportes pendientes"]
     end
+    E ==>|"Entrega"| H
+    K ==> M
 
-    G ==>|"Envío por Moodle, Correo o Aula Virtual"| H
-    K ==>|"Importar CSV"| L
-
-    %% Estilos de alto contraste para GitHub
     style S1 fill:#1e293b,stroke:#3b82f6,stroke-width:3px,color:#f8fafc
     style S2 fill:#0f2e24,stroke:#10b981,stroke-width:3px,color:#f8fafc
     style S3 fill:#312e81,stroke:#8b5cf6,stroke-width:3px,color:#f8fafc
-
-    style A fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style B fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style C fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style D fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style E fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style F fill:#0f172a,stroke:#60a5fa,stroke-width:2px,color:#ffffff
-    style G fill:#2e1065,stroke:#a78bfa,stroke-width:3px,color:#ffffff
-
-    style H fill:#06231c,stroke:#34d399,stroke-width:2px,color:#ffffff
-    style I fill:#06231c,stroke:#34d399,stroke-width:2px,color:#ffffff
-    style J fill:#06231c,stroke:#34d399,stroke-width:2px,color:#ffffff
-    style K fill:#134e4a,stroke:#2dd4bf,stroke-width:3px,color:#ffffff
-
-    style L fill:#1e1b4b,stroke:#c084fc,stroke-width:2px,color:#ffffff
-    style M fill:#1e1b4b,stroke:#c084fc,stroke-width:2px,color:#ffffff
-    style N fill:#1e1b4b,stroke:#c084fc,stroke-width:2px,color:#ffffff
-    style O fill:#4c1d95,stroke:#e9d5ff,stroke-width:3px,color:#ffffff
-
     linkStyle default stroke:#cbd5e1,stroke-width:3px
 ```
 
@@ -150,458 +99,291 @@ flowchart TD
 
 ## 🚀 4. Instalación y Puesta en Marcha
 
-Eye on the Sky **no requiere `npm install`, NodeJS, bases de datos ni configuración de servidores**. Funciona de inmediato como una aplicación web nativa:
+No requiere `npm install`, servidor ni base de datos.
 
-### 🟢 Opción A: Abrir directamente en el navegador
-1. Clona o descarga este repositorio:
-   ```bash
-   git clone https://github.com/tu-usuario/app-eye-on-the-sky.git
-   ```
-2. Haz doble clic en [`index.html`](file:///d:/Git/app-eye-on-the-sky/index.html) para el **Editor del Estudiante**.
-3. Haz doble clic en [`dashboard.html`](file:///d:/Git/app-eye-on-the-sky/dashboard.html) para el **Dashboard del Docente**.
+- **🟢 GitHub Pages (recomendado):** sube el repositorio y activa GitHub Pages. Los estudiantes usan la URL desde cualquier dispositivo y la app funciona sin conexión gracias al Service Worker (`sw.js`).
+- **🟡 Live Server:** clic derecho sobre `index.html` › *Open with Live Server*.
+- **🔵 Doble clic en `index.html`:** funciona, pero algunos navegadores limitan IndexedDB y el Service Worker con `file://`; para uso real publica en una URL.
 
-### 🟡 Opción B: Ejecutar con Live Server (VS Code / Antigravity)
-- Haz clic derecho sobre `index.html` y selecciona **Open with Live Server**.
-
-### 🔵 Opción C: Desplegar en la Web (GitHub Pages / Vercel)
-- Sube el repositorio a GitHub y activa **GitHub Pages** en la rama principal. ¡La app funcionará en la nube sin costo de hosting!
+> [!IMPORTANT]
+> El almacén del navegador (texto y capturas) pertenece a **una URL concreta en un navegador concreto**. Si el estudiante cambia de URL, de navegador o borra los datos del sitio, debe abrir su paquete .zip para recuperar el trabajo.
 
 ---
 
 ## 🎓 5. Manual del Estudiante (Editor)
 
-La interfaz del estudiante se encuentra en [`index.html`](file:///d:/Git/app-eye-on-the-sky/index.html).
+### 📁 5.1. Abrir, crear y continuar un proyecto
 
-### 📁 5.1. Abrir o Crear Carpeta / Archivo de Trabajo
+Al iniciar, la ventana de bienvenida ofrece:
+- ✨ **Crear nuevo documento.** En PC (Chrome/Edge) puede vincularse a una carpeta; en celulares se crea directamente en el navegador. Se pide **nombre y correo** del autor (el docente los usa para identificar la entrega y enviar el reporte).
+- 📂 **Abrir carpeta de proyecto (solo PC):** abre el `.json` o `.zip` **más reciente** de la carpeta (según su fecha de guardado interna) y guarda de vuelta en ese mismo archivo. Las capturas se sincronizan con la subcarpeta `capturas/`.
+- 📄 **Abrir proyecto existente (.zip o .json):** en Chrome/Edge de PC se pide permiso de escritura y, si se concede, **el autoguardado actualiza ese mismo archivo**. En celulares el proyecto pasa al almacén del navegador.
+- 📋 **Rescate:** pegar el texto de un `.json` (sin capturas).
 
-Al ingresar, una ventana de bienvenida ofrece opciones flexibles adaptadas tanto a computadoras como a teléfonos móviles:
-- ✨ **Crear nuevo documento:** 
-  - **En iPhone y teléfonos móviles (iOS Safari / Chrome iOS / Android):** Al presionar el botón azul, la aplicación **inicia el documento de inmediato** sin exigir carpetas físicas ni mostrar errores de compatibilidad. El trabajo se autoguarda de forma continua en la memoria segura del navegador (`localStorage`), permitiendo descargar el archivo `.json` cuando se desee desde el menú *Exportar*.
-  - **En computadoras de escritorio (Chrome / Edge en Windows/Mac/Linux):** Permite vincular una carpeta local del disco duro donde la app autoguarda directamente el archivo `documento.json` y la subcarpeta `capturas/`.
-- 📂 **Abrir carpeta existente (Solo computadoras):** Permite seleccionar una carpeta previamente vinculada en PC para continuar el proyecto con guardado directo en disco. En dispositivos móviles esta opción se oculta automáticamente para simplificar la interfaz.
-- 📄 **Abrir archivo .json existente:** 
-  - **Compatibilidad 100% móvil y multiplataforma:** Diseñado con un selector nativo superpuesto compatible con **iPhone (iOS Safari y Chrome)**, **Android (Chrome Mobile)** y **Windows/Mac/Linux**.
-  - Permite cargar el archivo desde la app *Archivos* de iOS, iCloud Drive, Google Drive o el explorador de descargas de Android.
-  - Al seleccionar el archivo, el proyecto se restaura al instante y se guarda automáticamente en `localStorage` para proteger la sesión si el teléfono suspende o recarga la pestaña por falta de memoria.
-- 📋 **Opción de Rescate (Pegar código JSON):** Si el estudiante tiene dificultades navegando en el explorador de archivos de su teléfono, puede desplegar la sección *"¿Problemas al seleccionar en iPhone o Android?"*, pegar el texto del archivo `.json` directamente y cargarlo en un solo toque.
+Al recargar la página dentro de 30 minutos en el mismo dispositivo, **se continúa la misma sesión** (no se crea una sesión nueva).
 
-> [!IMPORTANT]
-> **Permiso de acceso a archivos vs Modo Móvil:** La tecnología de selección de carpetas en disco (*File System Access API*) es exclusiva de navegadores de escritorio (Chrome y Edge en PC). En sistemas operativos móviles como iOS (iPhone/iPad), Apple restringe todos los navegadores al motor WebKit que no soporta carpetas directas. Eye on the Sky resuelve esto de forma **100% transparente**: en iPhone y Android el documento se crea de inmediato y se autoguarda cada 15 segundos en `localStorage` con soporte de exportación a archivo `.json` en cualquier momento.
+### 🔁 5.2. Trabajar en varios dispositivos
 
----
+1. Al terminar en un dispositivo: **Exportar › Paquete del proyecto (.zip)** (en celular: menú ☰ › *Descargar paquete*).
+2. En el otro dispositivo: **Abrir proyecto** y elegir ese **.zip sin descomprimirlo**. El texto, la telemetría y las capturas se restauran y los enlaces de las imágenes siguen funcionando.
+3. Para volver, repetir con el paquete más nuevo.
 
-### ✍️ 5.2. Redacción y Telemetría en Vivo
+Protecciones:
+- Si se abre una versión **anterior** del mismo proyecto, la app avisa antes de reemplazar la más nueva.
+- Si las dos versiones **se separaron** (se trabajó en ambos dispositivos sin llevar el archivo), avisa cuántas sesiones se perderían.
+- El celular nombra las descargas repetidas `archivo (1).zip`, `archivo (2).zip`…: elige siempre la más reciente.
 
-En la barra lateral derecha (*Telemetría*) y en la barra inferior de estado se monitoriza el proceso:
-- 🟢 **Escritura manual (% Salud):** Muestra el porcentaje de texto producido mediante digitación directa frente a pegados.
-- ✍️ **Palabras escritas:** Conteo de palabras redactadas manualmente en la sesión activa.
-- 📋 **Eventos de pegado:** Veces que se ha introducido texto externo.
-- ⏳ **Tiempo activo:** Cronómetro de la sesión en curso.
-- 📆 **Totales del proyecto:** Días de trabajo acumulados y sesiones totales registradas.
+### 📊 5.3. Panel "Actividad y Salud" (acumulado)
 
----
+Calculado con `analytics.js`, **el mismo módulo que usa el panel docente**:
+- **Texto tecleado por ti:** porcentaje del texto que **queda en el documento** escrito en el editor, sumando todas las sesiones y dispositivos, con el desglose por procedencia.
+- **Lo que verá tu docente:** la lista exacta de observaciones.
+- **Total del proyecto:** sesiones, días, palabras tecleadas, pegados declarados y sin declarar, tasa de revisión, fuentes con captura, dispositivos.
+- **Sesión actual:** palabras, pegados, tiempo y dispositivo.
+- **Autor del trabajo:** nombre y correo.
 
-### 🎨 5.3. Mapa de Colores de Procedencia del Texto (Auditoría Visual)
+### 🎨 5.4. Colores de procedencia
 
-Para que el estudiante comprenda el significado de las métricas del dashboard mientras redacta, el editor incorpora un **sistema de colores en vivo**:
-
-| Color de Resaltado | Significado y Tipo de Actividad | Impacto en Telemetría |
+| Color | Significado | Efecto |
 | :--- | :--- | :--- |
-| <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:4px; font-weight:700;">🔴 Rojo / Salmón</span> | **Texto pegado externo:** Texto proveniente del portapapeles (páginas web, IA, otros documentos). | Registra evento de pegado y reduce el % de escritura manual. |
-| <span style="background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:4px; font-weight:700;">🔵 Azul suave</span> | **Pegado inicial exento:** Bloque de notas o apuntes pegados al iniciar el documento vacío. | **Exento:** No penaliza el puntaje de salud del trabajo. |
-| <span style="background:#f3e8ff; color:#6b21a8; padding:2px 8px; border-radius:4px; font-weight:700;">🟣 Púrpura suave</span> | **Citas científicas insertadas:** Referencias bibliográficas agregadas desde el panel de fuentes. | Reconocido como práctica científica legítima. |
-| <span style="background:#f8fafc; color:#334155; padding:2px 8px; border-radius:4px; font-weight:700;">⚪ Fondo limpio</span> | **Redacción manual genuina:** Caracteres digitados directamente por el estudiante en su teclado. | Incrementa el porcentaje de salud y palabras manuales. |
+| ⚪ Sin color | Tecleado en el editor | Suma al "texto tecleado". |
+| 🔵 Azul | Notas propias declaradas | No penaliza; presupuesto 35 % del documento. |
+| 🟢 Verde azulado | Cita textual declarada (vinculada a una fuente) | No penaliza; presupuesto 15 %. |
+| 🟠 Ámbar | Texto con IA declarado | Se reporta; presupuesto 10 % (más es alerta crítica). |
+| 🔴 Rojo | Pegado sin declarar | Advertencia desde 8 %, crítica desde 20 %. |
+| 🟣 Púrpura | Referencia bibliográfica insertada | Neutra. |
 
-#### 🕶️ Modo de Lectura Limpia
-En la barra lateral derecha, en la sección **"Procedencia del texto"**, encontrarás el botón:
-- **"🕶️ Ocultar colores" / "👁️ Ver colores":** Permite al estudiante apagar visualmente los resaltados para leer su manuscrito con total comodidad, sin alterar los metadatos de auditoría guardados en el archivo.
+Los límites están en `POLICY` dentro de `analytics.js` y el docente puede ajustarlos. El texto que se escribe a continuación de un tramo coloreado no hereda el color, y **"Limpiar formato" (Tx) conserva los colores**. El botón "Ocultar" del panel los oculta solo visualmente.
 
----
+### 📋 5.5. Pegados, inserciones y reubicaciones
 
-### 🔒 5.4. Biometría de Escritura (Huella Digital de Tecleo)
+- **Pegado de 12 palabras o más** (Ctrl+V, menú del celular, arrastrar y soltar, pegado dentro de una tabla): se marca en rojo y se abre la ventana **"¿Qué acabas de pegar?"** con el fragmento. Al declararlo cambia de color; con "No declarar" queda rojo.
+- **Pegados cortos** (una palabra, un DOI): se registran como pegado sin declarar, sin ventana.
+- **Cortar/copiar y pegar dentro del documento:** se reconoce como reubicación de texto propio y conserva su color original.
+- **Deshacer/Rehacer (Ctrl+Z / Ctrl+Y)** no cuenta como escritura ni como pegado.
+- Citas, índice, bibliografía, tablas y capturas insertadas por la app no cuentan como escritura ni como pegado.
 
-Para asegurar que el documento siempre está siendo redactado por el mismo autor, Eye on the Sky incorpora un motor de **dinámica de tecleo (*Keystroke Dynamics*)**:
+### 🔒 5.6. Ritmo de tecleo (indicador informativo)
 
-1. **Captura de métricas fisiológicas:**
-   - ⏱️ **Dwell Time:** Tiempo exacto en milisegundos que el dedo presiona una tecla antes de soltarla.
-   - ⏸️ **Flight Time:** Pausa en milisegundos entre soltar una tecla y presionar la siguiente.
-   - ␣ **Pulsación de espacio y retroceso:** Tiempos característicos de pausa de pensamiento y corrección de errores.
-2. **Calibración a las 250 pulsaciones:**
-   - Durante las primeras 250 pulsaciones manuales del estudiante, el sistema calibra la línea base (*baseline*) del autor.
-   - Al completarse, se despliega una ventana modal notificando:
-     > *"🎯 ¡Huella Digital de Escritura Calibrada! Se ha registrado el patrón único de tecleo para certificar la autoría de este trabajo."*
-3. **Monitoreo sesión a sesión:**
-   - Cada nueva sesión compara el vector de pulsaciones contra la huella calibrada y calcula un índice de consistencia (0% a 100%).
+Mide la permanencia en tecla (*dwell*) y la pausa entre teclas (*flight*). Se calibra con 250 pulsaciones con **teclado físico** y luego compara cada sesión (mínimo 25 pulsaciones). En pantallas táctiles **no se mide** (el teclado virtual no da tiempos comparables y en Android suele no identificar las teclas). Los atajos con Ctrl no se cuentan. Umbrales: ≥ 75 % consistente, 60–74 % variación moderada, < 60 % advertencia.
 
----
+### 🔊 5.7. Sonidos
 
-### 📋 5.5. Gestión del Pegado Inicial Masivo (Cero Penalización en Estadísticas)
+Carpeta `sounds/` (en minúsculas): `session_start.mp3`, `milestone_words.mp3`, `source_captured.mp3`, `autosave_peace.mp3`, `paste_alert.mp3`, `export_success.mp3`. Los hitos (100, 250, 500… palabras) solo suenan al cruzarlos, no al abrir un documento que ya los superó.
 
-Sabemos que en la investigación académica los estudiantes inician frecuentemente un trabajo a partir de notas de campo, apuntes previos, esquemas preliminares o directrices de cátedra:
+### 📚 5.8. Fuentes y citas
 
-- 🎁 **Regla del Primer Pegado Masivo (100% Exento):**
-  - El **primer pegado masivo** que el estudiante realiza en su proyecto queda **completamente exento** de penalizaciones estadísticas, sin importar si antes ya escribió el título, su nombre o un encabezado de sección.
-  - **Impacto Cero en Métricas:**
-    - 🟢 **0 caracteres penalizados:** No se suma al contador de `Caracteres pegados` (`chars_pasted = 0`).
-    - 🟢 **100% de Escritura Manual:** El puntaje de salud del manuscrito permanece en 100% (no colapsa ni muestra color rojo).
-    - 🟢 **0 eventos de pegado punibles:** El contador de pegados no se incrementa (`Eventos de pegado = 0`).
-    - 🔇 **Sin alarmas sonoras:** No se reproduce el sonido de alerta de copia (`paste_alert`), notificando en pantalla con un mensaje azul de confirmación.
-    - 🔵 **Resaltado en azul suave:** En el editor se marca visualmente con fondo azul tenue (`🔵 Base exenta`), diferenciándolo nítidamente de posteriores pegados no autorizados (rojo).
-    - 📱 **Soporte universal:** Funciona tanto en computadoras de escritorio (Ctrl+V / Cmd+V) como en menús contextuales de dispositivos móviles (Android / iOS) e inserciones de texto por arrastre.
-- 👨‍🏫 **Tratamiento en el Dashboard Docente:**
-  - En la bitácora de sesiones, el evento se identifica con la etiqueta informativa **"Base exenta"** y el contador de pegados se muestra en `0`.
-  - **Sin falsas alertas de salto atípico:** El algoritmo de auditoría descuenta automáticamente las palabras del pegado inicial al calcular el ritmo de redacción por minuto, evitando que se dispare erróneamente la advertencia de *"Salto atípico en sesión X"*.
-- ⚠️ **Pegados posteriores (Monitoreados y Penalizados):** Cualquier segundo o subsecuente pegado masivo durante el proceso de redacción sí se considerará una inserción externa no justificada, siendo registrado con su volumen en caracteres, emitirá la alarma sonora correspondiente y reducirá el porcentaje de redacción manual del manuscrito.
+- **DOI (Crossref)** o **BibTeX** (individual o en lote).
+- Estilos por fuente: **Chicago nota** (`Nombre Apellido, "Título," Revista (Año), pág.`), **Chicago autor-fecha** (`(Apellido Año, pág.)`), **APA 7** (`(Apellido, Año, p. pág.)`) y **MLA 9** (`(Apellido pág.)`).
+- **Bibliografía:** se genera en el estilo más usado por las fuentes, ordenada por apellido, con el título correspondiente (Bibliografía / Referencias / Obras citadas).
 
----
+### 📸 5.9. Capturas de evidencia
 
-### 🔊 5.6. Gamificación y Efectos de Sonido
+- Al registrar una fuente se puede adjuntar la captura de la página del PDF consultado. **Funciona en celulares y en PC.**
+- El botón **Captura** inserta una imagen real en el documento con un pie opcional.
+- Cada imagen se reduce a 1600 px como máximo, recibe un nombre estable (`cap_AAAAMMDDhhmmss_xxxxx.jpg`) y una huella SHA-256 registrada en `captures` del proyecto.
+- Si una captura no está en el dispositivo actual, se marca **"⚠ no disponible"**; al hacer clic se puede volver a adjuntar. Si la imagen no es idéntica a la original, queda registrada como **reemplazo** y el docente lo ve.
 
-El editor incluye retroalimentación auditiva para potenciar la concentración y premiar el avance:
-- 📁 **Carpeta local:** Los sonidos se ubican en la carpeta `Sounds/`. La aplicación utiliza una lista blanca estricta e ignora cualquier archivo con nombres no autorizados.
+### 💾 5.10. Guardado
 
-| Archivo | Evento Disparador | Propósito Pedagógico |
-| :--- | :--- | :--- |
-| `typing_keystroke.mp3` | Tecleo manual continuo | Refuerzo táctil y sensación de máquina de escribir moderna. |
-| `paste_warning.mp3` | Pegado de texto externo | Advertencia sutil de que el pegado queda registrado en auditoría. |
-| `citation_success.mp3` | Inserción de cita bibliográfica | Recompensa auditiva por respaldar una afirmación con evidencia. |
-| `session_start.mp3` | Inicio de nueva sesión de trabajo | Establece el inicio del bloque de concentración. |
-| `milestone_words.mp3` | Alcanzar cada 500 palabras manuales | Celebración del progreso incremental del manuscrito. |
-| `calibration_complete.mp3` | Certificación de huella biométrica | Notificación de que el perfil de autor ha sido asegurado. |
+- Autoguardado **cada 15 segundos** si hay cambios, al cambiar de pestaña y al cerrar.
+- Siempre en el almacén del navegador; además en la carpeta vinculada o en el archivo abierto con permiso de escritura (un paquete .zip abierto así se reescribe como máximo cada 60 s).
+- <kbd>Ctrl</kbd> + <kbd>S</kbd> guarda y muestra las estadísticas acumuladas.
 
----
+### 📦 5.11. Exportaciones
 
-### 📚 5.7. Registro de Fuentes y Citación Científica
+- **Paquete del proyecto (.zip):** `proyecto.json` + `capturas/` + `LEEME.txt`. **Es el formato para cambiar de dispositivo y para entregar.**
+- **Solo datos (.json):** sin capturas (avisa si el proyecto tiene capturas).
+- **PDF:** impresión del navegador (los colores de procedencia no se imprimen).
+- **Word (.docx):** con capturas como imágenes, tablas y bibliografía (solo se agrega si el documento no la tiene).
+- **Zotero (.ris).**
 
-Haz clic en **"Agregar fuente"** (o el botón `+` en la barra lateral izquierda):
-1. 🔍 **Búsqueda por DOI:** Escribe el DOI (ejemplo: `10.1016/j.jclinepi.2020.06.014`) y haz clic en **"Buscar"**. La app consultará la API de Crossref y completará título, autores, año y revista automáticamente.
-2. 📥 **Importación BibTeX (Individual o en Lote):** Pega una o decenas de entradas BibTeX (exportadas de Scopus, Web of Science, Google Scholar o Zotero) en la pestaña **"Importar BibTeX"** y haz clic en **"Importar entradas"**.
-3. 📝 **Cita en el texto:** Haz clic en **"Citar"** para insertar automáticamente la cita en formato **Chicago (Nota al pie)**, **Chicago (Autor-Año)** o **APA 7ma edición**.
+### 📱 5.12. Interfaz en PC y celular
 
----
-
-### 📸 5.8. Inserción de Capturas de Evidencia (PDFs)
-
-Para demostrar que un artículo científico fue leído y consultado legítimamente:
-1. Al dar de alta una fuente, arrastra o sube una captura de pantalla de la página del PDF donde se encuentra el párrafo que estás citando.
-2. La imagen se guarda en tu carpeta local `capturas/` con un nombre único y normalizado (ej. `capturas/src-123-evidencia.png`).
-3. Puedes hacer clic en **"Insertar captura"** en la barra superior para incrustar la imagen en el documento con su pie de foto correspondiente.
-
----
-
-### 💾 5.9. Autoguardado e Integridad Criptográfica Local
-
-- 🔄 **Autoguardado cada 30 segundos:** La aplicación graba tu progreso de forma automática en `documento.json`.
-- 👁️ **Guardado al cambiar de pestaña:** Si minimizas la ventana o cambias de pestaña, el sistema guarda de inmediato.
-- ⌨️ **Atajo directo:** Puedes presionar <kbd>Ctrl</kbd> + <kbd>S</kbd> en cualquier momento.
-- 🔒 **Firma criptográfica:** Cada guardado recalcula una firma digital **SHA-256** dentro de `_signature` para certificar que el archivo no fue manipulado a mano con un editor de texto.
-
----
-
-### 📦 5.10. Exportaciones para la Entrega
-
-Desde el menú **Exportar**:
-- 📄 **Exportar a PDF:** Genera la vista de impresión académica con todas las citas e imágenes incrustadas.
-- 📝 **Exportar a Word (.docx):** Descarga el manuscrito listo para abrir en Microsoft Word.
-- 🗃️ **Bibliografía para Zotero (.ris):** Descarga tus fuentes en formato estándar RIS para importarlas a tu biblioteca de Zotero con un solo clic.
-- 💾 **Descargar copia JSON:** Genera un duplicado de respaldo de tu archivo `documento.json`.
-
----
-
-### 📱 5.11. Modos de Visualización: Windows (Escritorio) y Android/iOS (Móvil)
-
-Para garantizar la mejor experiencia adaptada tanto a computadoras de escritorio (Windows, Mac, Linux) como a dispositivos móviles táctiles (Android, iPhone), la barra superior y los paneles diferencian de forma inteligente su interfaz:
-
-- 💻 **En Windows y computadoras de escritorio ($\ge$ 769px):**
-  - **Barra de acciones limpia y unificada:** Reúne las herramientas en la barra principal sin duplicados redundantes:
-    - 📖 **Panel de fuentes bibliográficas (`#btn-toggle-sources`)**
-    - 📈 **Panel de actividad y salud (`#btn-toggle-tele`)**
-    - 📑 **Índice / Esquema TOC (`#btn-toggle-toc`):** Ubicado en la barra de escritorio exactamente entre el ícono de actividad y el selector de tema, permitiendo invocar la estructura de contenidos con un solo clic.
-    - ☀️/🌙 Cambio de tema claro/oscuro
-    - 🔔 Efectos de sonido
-    - 💾 Guardar ahora (con estadísticas)
-    - 📦 Menú de exportación (PDF, Word, RIS, JSON)
-    - 🎓 Acceso al Panel Docente
-    - 📁 **Botón de carpeta (`#btn-open-folder`):** Muestra de forma permanente el **nombre de la carpeta elegida** por el usuario para su proyecto (por ejemplo `MiCarpetaTesis`), nunca el nombre técnico del archivo JSON abierto. Si no hay carpeta enlazada, invita a *"Abrir / Crear carpeta"* o *"Vincular carpeta"*.
-  - **Menú Hamburguesa visible en Windows (☰) con títulos destacados:** Siguiendo las directrices de diseño, el botón de menú hamburguesa se encuentra visible permanentemente en el extremo derecho de la barra superior en Windows. Al pulsarlo, despliega un panel lateral deslizante (*drawer*) de 340 px con todas las opciones del sistema. Los títulos de cada sección (**"VISTAS Y PANELES"**, **"PREFERENCIAS"**, **"ARCHIVO Y GUARDADO"**, **"EXPORTAR MANUSCRITO"** y **"DOCENCIA"**) cuentan con el **doble de tamaño** (`1.44rem`) y tipografía en **negrilla intensa** (`font-weight: 800`) con alto contraste, haciéndolos inmediatamente notorios y legibles tanto en modo claro como en modo oscuro.
-  - **Cero duplicados en escritorio:** Los accesos directos táctiles coloreados específicos de móvil se ocultan automáticamente en pantallas de escritorio, manteniendo la cabecera despejada y profesional.
-
-- 📱 **En teléfonos móviles y pantallas estrechas ($\le$ 768px):**
-  - **Accesos directos coloreados en la cabecera:** Junto al botón de menú hamburguesa se ubican 3 accesos directos táctiles de acceso rápido:
-    - 🟢 **Fuentes bibliográficas** (Verde Esmeralda): Abre o conmuta directamente el panel lateral a la lista de referencias científicas.
-    - 🔵 **Índice / Esquema (TOC)** (Celeste): Abre o conmuta directamente a la estructura jerárquica de contenidos.
-    - 🔴 **Actividad y Salud** (Rosa / Coral): Abre o cierra directamente el panel de telemetría y salud del manuscrito.
-  - **Paneles flotantes tipo overlay:** Los paneles se abren superpuestos para no comprimir el lienzo de redacción.
-
-- 🧠 **Discriminación Inteligente de Pestañas (Fuentes vs. TOC):**
-  - Al pulsar el botón de **Fuentes**: Si el panel lateral estaba cerrado, se abre mostrando la pestaña *Fuentes*. Si ya estaba abierto pero el usuario se encontraba revisando el *Índice / TOC*, el panel **no se cierra**, sino que conmuta limpiamente a la pestaña *Fuentes*. Solo si ya está abierto en *Fuentes* y se pulsa de nuevo, se colapsa.
-  - Al pulsar el botón de **Índice (TOC)**: Si el panel estaba cerrado, se abre mostrando *Contenido / TOC*. Si ya estaba abierto en *Fuentes*, conmuta fluidamente a *TOC* sin cerrar el panel. Si ya está abierto en *TOC* y se pulsa de nuevo, se colapsa.
-  - Esto garantiza que el redactor nunca pierda el hilo ni cierre accidentalmente la barra lateral al alternar entre fuentes y contenidos.
-
----
-
-### 📐 5.12. Nuevas Herramientas de Formato y Estructura Académica
-
-Con el fin de ofrecer una experiencia completa de procesador de textos académico profesional, se incorporaron 8 nuevas funcionalidades especializadas:
-
-#### 1. Estilos Tipográficos Normativos (H1 a H5) y Selector Optimizado
-Los niveles de encabezado aplican automáticamente un código cromático y estructural para jerarquizar el manuscrito:
-* **H1 (Título principal):** Color negro (`#1a1d23` en tema claro, adaptado en tema oscuro), sin sangría.
-* **H2 (Sección):** Color celeste (`#2196F3` en tema claro, `#64b5f6` en tema oscuro), sangría de 4 espacios (`padding-left: 4ch`).
-* **H3 (Subsección):** Color celeste (`#2196F3`), sangría de 8 espacios (`padding-left: 8ch`) y estilo *cursiva*.
-* **H4 (Sub-apartado):** Color verde lechuga (`#7CB342`), sin sangría.
-* **H5 (Nivel de detalle):** Color lila (`#9C27B0`), sin sangría.
-* **Párrafos de texto regular:** Sangría de primera línea de 4 espacios (`text-indent: 4ch`).
-* **Selector de estilos más compacto (-10 px):** El menú desplegable de títulos en la barra de herramientas se ajustó con **10 px horizontales menos** (de 98 px a 88 px), liberando espacio para que los demás botones de edición y citas quepan holgadamente sin saturar la barra superior. Previsualiza los nombres en español ("Normal", "Título 1" a "Título 5") junto a sus colores y sangrías reales.
-
-#### 2. Herramientas de Sangría Triple (Izquierda, Derecha y Ambas)
-En la fila de herramientas de formato se integraron 3 botones de sangría:
-* **Sangría Izquierda:** Aumenta progresivamente el margen izquierdo del párrafo o bloque seleccionado.
-* **Sangría Derecha:** Aplica un margen derecho para estrechar el párrafo hacia la derecha.
-* **Sangría a Ambos Lados:** Aplica márgenes simétricos a izquierda y derecha, indispensable para **citas textuales en bloque** (citas de más de 40 palabras según las normas APA y Chicago). Al presionar el botón sucesivamente, conmuta entre los niveles 1, 2, 3 o elimina la sangría.
-
-#### 3. Tabla de Contenidos (TOC) Navegable, Auto-actualizable e Insertable
-* **Pestañas en panel lateral:** El panel izquierdo incluye pestañas de acceso táctil e instantáneo para alternar entre **"Fuentes"** e **"Índice / Contenido"**.
-* **Auto-actualizable:** Al escribir o cambiar títulos (H1-H5) en el documento, el índice lateral se regenera en tiempo real sin recargar la página.
-* **Navegación precisa y fluida:** Al pulsar cualquier sección en el TOC, el visor realiza un scroll suave centrado directamente en el encabezado, coloca el cursor de redacción en la posición correspondiente y resalta el título con una animación visual de pulso. En móviles ($\le 900\text{px}$), el panel se retira de inmediato para mostrar el contenido.
-* **Botón Insertar índice dentro del panel:** El comando para plasmar el índice en el manuscrito se encuentra integrado exclusivamente dentro del panel del TOC (`Insertar índice`), dejando la barra de herramientas principal limpia y despejada. Genera un bloque de *Índice General* en la posición del cursor con líneas de puntos guía (*dotted leaders*) y la página calculada.
-
-#### 4. Bibliografía Académica Insertable
-* Al pulsar el botón **"Bibliografía"** en la barra superior, el editor toma todas las fuentes registradas en el proyecto y genera automáticamente la sección de referencias al final del documento.
-* **Orden alfabético:** Ordena las entradas por el apellido del autor principal.
-* **Sangría francesa (*hanging indent*):** Aplica la indentación reglamentaria de 2.5em con primera línea alineada al margen.
-* **Estilos normativos:** Da formato a cada ficha según el estilo bibliográfico activo (Chicago nota completa, APA 7.ª edición o MLA).
-
-#### 5. Herramienta de Tablas con Autoajuste y Wrapping Condicional Inteligente
-* **Inserción táctil y modal:** Al pulsar el botón **"Tabla"** (optimizado con soporte táctil universal e interactivo para Android y PC), un diálogo modal permite indicar el número de filas (1 a 25), columnas (1 a 10) y si se desea incluir fila de encabezados resaltada.
-* **Autoajuste de columnas:** Cada columna ajusta automáticamente su ancho al texto de la celda más larga (`white-space: nowrap`), asegurando un aspecto ordenado y compacto.
-* **Wrapping condicional:** Si la suma de anchos de las columnas excede los márgenes de la hoja de trabajo, el sistema activa automáticamente el salto de línea interno en las celdas (`table-wrapped`), evitando que la tabla se desborde fuera de la página.
-* **Controles directos:** Cada tabla cuenta con una barra de herramientas superior que permite añadir filas (`+ Fila`), columnas (`+ Columna`), eliminarlas (`- Fila`, `- Columna`) o suprimir la tabla entera.
-
-#### 6. División de Página Nítida No Oclusiva, Conteo de Líneas y Estabilidad de Scroll
-* **Línea divisoria no oclusiva con insignia lateral:** El corte entre páginas se representa mediante una línea discontinua elegante (`1.5px dashed`) cada 1056 px acompañada de una insignia flotante compacta en el margen derecho (`📄 Fin de Página X · Página Y`). Al tener altura cero y fondo 100% transparente, **garantiza que ningún título ni línea de texto quede oculta ni tapada** (solucionando el problema previo de bloques opacos sobre los límites de página).
-* **Estabilidad total de navegación y foco al aplicar estilos:** Al aplicar cualquier estilo de título (H1 a H5) desde la barra de herramientas, el sistema preserva de manera exacta la posición de desplazamiento (`scrollTop`) y el contenedor de scroll del editor. El cursor y el texto seleccionado permanecen visibles de inmediato en pantalla sin provocar saltos bruscos hacia el inicio del documento.
-* **Conteo exacto de líneas sin reinicios erráticos:** El sistema calcula las líneas reales por bloques y párrafos dentro de cada página. A medida que el redactor avanza, las líneas se contabilizan de forma consistente (Línea 1, 2, 3...) y únicamente pasan a la siguiente página al cruzar la línea divisoria.
-* **Barra de estado despejada:** Mantiene exclusivamente el indicador unificado de precisión **`Línea [X] de Pág. [Y]`** (ej. *Línea 12 de Pág. 2*).
-* **Tooltip flotante en la barra de desplazamiento:** Al arrastrar la barra de scroll o desplazarse con la rueda del ratón/táctil, aparece un distintivo flotante junto al cursor de desplazamiento que indica la página actual en tiempo real y desaparece automáticamente al soltar.
+En pantallas de 769 px o más, la barra superior reúne las herramientas y el menú ☰ abre un panel lateral. En celulares hay accesos directos a Fuentes, Índice y Actividad, y los paneles se superponen al lienzo (se cierran solos al girar el teléfono o abrir el teclado para dejar más espacio de escritura).
 
 ---
 
 ## 👨‍🏫 6. Manual del Docente (Dashboard de Auditoría)
 
-El panel del profesor se encuentra en [`dashboard.html`](file:///d:/Git/app-eye-on-the-sky/dashboard.html).
+### 📥 6.1. Carga
 
-### 📥 6.1. Carga Masiva de Trabajos (.JSON)
+Arrastra los **paquetes .zip** del curso (también acepta `.json`). Con el .zip, cada captura se verifica contra su huella SHA-256: *verificada*, *reemplazada por el estudiante*, *no coincide*, *falta en el paquete* o *sin huella (versión anterior)*. Si el mismo proyecto llega dos veces, se conserva la versión más reciente.
 
-1. Abre [`dashboard.html`](file:///d:/Git/app-eye-on-the-sky/dashboard.html) en tu navegador.
-2. Arrastra todos los archivos `.json` que te hayan enviado tus estudiantes a la zona de carga (o selecciónalos todos juntos con el selector de archivos).
-3. En menos de un segundo, el dashboard procesa, audita y valida las firmas de todos los proyectos en lote.
+### 📊 6.2. Vista del curso
 
----
+Indicadores agregados, gráfico de **procedencia del texto final** por estudiante (apilado al 100 %) y gráfico de sesiones y días. La tabla muestra correo, sesiones y dispositivos, % tecleado, % sin declarar, fuentes con captura (y capturas verificadas), palabras, ritmo de tecleo y alertas.
 
-### 📊 6.2. Vista General y Métricas del Curso
+### 🔍 6.3. Detalle del estudiante
 
-El panel superior calcula instantáneamente indicadores consolidados para todo el curso:
-- 👥 **Total de estudiantes evaluados.**
-- 📝 **Promedio de palabras por manuscrito.**
-- ✍️ **Porcentaje promedio de redacción manual.**
-- 📸 **Porcentaje de fuentes respaldadas con captura de evidencia.**
-- 📅 **Promedio de sesiones dedicadas por estudiante.**
-- 📊 **Gráficos Chart.js interactivos:** Distribución de originalidad del texto (escritura manual vs. pegados) y dispersión de sesiones de trabajo.
+- Alertas e indicios.
+- Barra de procedencia del texto final.
+- **Crecimiento del documento en el tiempo** con los pegados marcados.
+- **Proceso de escritura:** tasa de revisión, ediciones no lineales, pausas y tiempo efectivo.
+- **Pegados registrados** con fecha, tipo declarado, fuente (en citas textuales) y fragmento.
+- Dispositivos utilizados, ritmo de tecleo, fuentes con miniatura de la captura e historial de sesiones.
 
----
+### 🚨 6.4. Alertas (mismas reglas que ve el estudiante)
 
-### 📈 6.3. Auditoría del Proceso Incremental (Sesión a Sesión)
+| Nivel | Alerta | Regla (`analytics.js › POLICY`) |
+| :---: | :--- | :--- |
+| 🚨 | Documento en 1 sola sesión | > 200 palabras propias (sin contar lo declarado) en 1 sesión |
+| ⚠️ | Pocas sesiones | ≤ 2 sesiones con > 600 palabras propias |
+| ⚠️ | Salto atípico | > 400 palabras netas no declaradas a > 65 palabras/min |
+| ⚠️ | Pocos días | > 1000 palabras en 1 día |
+| 🚨/⚠️ | Pegado sin declarar | ≥ 20 % / ≥ 8 % del texto final |
+| ⚠️ | Poco texto tecleado | < 40 % del texto final (con ≥ 150 palabras) |
+| ⚠️ | Presupuestos de lo declarado | Notas > 35 %, citas textuales > 15 % |
+| 🚨 | IA declarada sobre el límite | > 10 % |
+| ⚠️ | Patrón de transcripción | ≥ 3000 car. tecleados con teclado, revisión < 4 % y < 1 edición no lineal por 1000 car. |
+| ⚠️ | Ritmo de tecleo | Alguna sesión con teclado < 60 % de consistencia |
+| 🚨/⚠️ | Fuentes y capturas | Sin fuentes / ninguna con captura / menos de la mitad |
+| 🚨/⚠️ | Capturas del paquete | No coinciden con su huella / faltan |
+| ⚠️ | Integridad | La firma del JSON no coincide |
 
-Al hacer clic en el botón **"Detalle"** de cualquier estudiante, se abre su expediente completo:
+Los archivos de versiones anteriores (sin procedencia por fragmento) se evalúan con el método antiguo basado en eventos y se marcan como "estimado".
 
-```plaintext
-Evolución incremental:
-[S1: 12-sep] 0 ➔ 450 pal. (+450)  ➔  [S2: 15-sep] 450 ➔ 890 pal. (+440)  ➔  [S3: 20-sep] 890 ➔ 1,420 pal. (+530)
-```
+### 📑 6.5. CSV
 
-En la tabla de historial de sesiones se audita con precisión forense:
-- 🔢 **# Sesión:** Secuencia cronológica.
-- 📅 **Fecha y Horario:** Horas exactas de inicio y término (ejemplo: `20/09/2026 14:10 – 14:55`).
-- ⏱️ **Duración:** Tiempo efectivo invertido.
-- 📈 **Progreso de palabras:** Conteo inicial ➔ conteo final y saldo neto ganado.
-- ⌨️ **Texto manual vs Pegados:** Palabras escritas a mano vs caracteres pegados del portapapeles.
-- 🔒 **Biometría de la sesión:** Porcentaje de coincidencia con la huella del autor.
-- 🔤 **Pulsaciones reales:** Registro de pulsaciones de teclado asociadas.
+Columnas: Estudiante, Correo, ID proyecto, Título, Sesiones, Días activos, Dispositivos, Total palabras, % Tecleado, % Pegado sin declarar, % Notas declaradas, % Citas textuales, % IA declarada, Pegados sin declarar, Pegados declarados, Tasa de revisión, Minutos de tecleo, Fuentes totales, Fuentes con captura, Fuentes citadas, Capturas verificadas, Huella biométrica, Biometría última y mínima, Nivel de alerta, Alertas, Integridad JSON, Último guardado. UTF-8 con BOM (Excel y Google Sheets).
 
----
+### 📧 6.6. Envío de reportes con Google Sheets + Apps Script
 
-### 🎯 6.4. Auditoría Biométrica y Detección de Suplantación de Autor
+1. En tu Google Sheets: **Extensiones › Apps Script**, pega `codigo_apps_script.gs`, guarda y recarga.
+2. **🎓 Eye on the Sky › ⚙️ Preparar hojas.** Crea:
+   - **`Estudiantes`**: tu **lista oficial** (columnas `Estudiante` y `Correo`).
+   - **`Reporte`**: se llena al importar el CSV.
+3. **📥 Importar CSV del panel docente** (elige el archivo exportado). Se conserva el estado de envío de importaciones anteriores.
+4. **👁️ Vista previa** / **🧪 Enviarme una prueba** sobre una fila.
+5. **📧 Enviar reportes pendientes.**
 
-El dashboard audita la huella dactilar de tecleo de cada estudiante:
-- 🟢 **✓ 75% - 100% (Autor Confirmado):** Los tiempos de permanencia en tecla (*dwell*) y pausas de vuelo (*flight*) son enteramente consistentes con el autor registrado.
-- 🟡 **! 60% - 74% (Divergente):** Variación moderada en el ritmo de tecleo.
-- 🔴 **⚠ < 60% (Alerta Crítica: Cambio de Autor):** Fuerte discrepancia fisiológica en el patrón de tecleo. Indica con alta probabilidad que otra persona tomó control del teclado o redactó esa sección del trabajo.
+Reglas de envío: se usa el correo de la hoja `Estudiantes` cuyo nombre coincida (sin distinguir tildes ni mayúsculas). Si no coincide, el correo escrito por el estudiante en el editor **solo si figura en la lista** (configurable con `SOLO_CORREOS_DE_LA_LISTA`). Un mismo reporte no se reenvía; si las métricas cambian en una nueva importación, la fila vuelve a quedar pendiente. Se respeta la cuota diaria de Gmail (100 correos en cuentas gratuitas, 1500 en Workspace). El correo usa tablas y estilos en línea, compatibles con Gmail y Outlook.
 
----
+### 🧪 6.7. Estudiantes demo
 
-### 🚨 6.5. Sistema Inteligente de Alertas
+`estudiantes_demo/` incluye 6 casos en formato antiguo (se evalúan por eventos):
 
-El sistema califica automáticamente el nivel de riesgo de cada entrega:
-
-| Nivel | Icono | Tipo de Alerta | Causa / Diagnóstico Docente |
-| :---: | :---: | :--- | :--- |
-| **Peligro** | 🚨 | **Documento realizado en 1 sola sesión** | El documento tiene cientos o miles de palabras manuales pero solo registra 1 sesión de trabajo (descontando el material base inicial exento). |
-| **Peligro** | 🚨 | **Baja escritura manual (< 40%)** | Más del 60% del documento fue producto de operaciones de pegado masivo no autorizadas. |
-| **Peligro** | 🚨 | **Cero fuentes con captura** | Ninguna de las fuentes bibliográficas citadas incluye evidencia visual de lectura. |
-| **Peligro** | 🚨 | **Discrepancia biométrica crítica** | El patrón de tecleo no coincide con la huella registrada del estudiante (suplantación de autoría). |
-| **Advertencia** | ⚠️ | **Salto atípico en sesión X** | Aumento brusco de texto (+400 palabras netas a un ritmo sobrehumano > 65 palabras/min, descontando el pegado inicial exento). |
-| **Advertencia** | ⚠️ | **Pocos días activos para el volumen** | Documentos extensos confeccionados en 1 solo día de trabajo. |
-| **Advertencia** | ⚠️ | **Modificación manual del JSON** | La firma criptográfica SHA-256 no coincide; el alumno intentó alterar las telemetrías con un editor de texto externo. |
-| **Correcto** | 🟢 | **Sin alertas** | Muestra consistencia incremental, sesiones distribuidas, biometría estable y fuentes respaldadas. |
-
----
-
-### 📑 6.6. Exportación a Excel / Google Sheets (CSV)
-
-Haz clic en **"Exportar reporte CSV"** en el encabezado del dashboard:
-- Descarga un archivo con codificación UTF-8 con BOM legible de inmediato en **Microsoft Excel** y **Google Sheets**.
-- Columnas incluidas: Estudiante, Título, Sesiones, Días activos, % Manual, Caracteres pegados, Fuentes totales, Con captura, Citadas en texto, Total palabras, Huella biométrica, Similitud biométrica (%), Permanencia media (ms), Pausa de vuelo (ms), Nivel de alerta, Alertas detalladas y Validación de integridad SHA-256.
+| Archivo | Caso |
+| :--- | :--- |
+| `estudiante_1_sofia_morales_impecable.json` | Proceso incremental sin alertas |
+| `estudiante_2_mateo_rios_sospecha_suplantacion.json` | Sesión con ritmo de tecleo muy distinto (advertencia informativa) |
+| `estudiante_3_lucas_peralta_copia_pega.json` | Pegado masivo en una sola sesión, sin capturas |
+| `estudiante_4_valeria_castillo_una_sesion.json` | Documento completo en una sesión |
+| `estudiante_5_diego_torres_json_alterado.json` | Firma JSON alterada |
+| `estudiante_6_camila_vargas_divergencia_leve.json` | Variación leve de ritmo y pocas capturas |
 
 ---
 
-### 📧 6.7. Envío Masivo de Reportes Gráficos por Correo (Google Sheets + Apps Script)
+## ☁️ 6bis. Registro del curso en Google Sheets (en vivo)
 
-Una de las grandes fortalezas de Eye on the Sky es permitir al docente enviar retroalimentación gráfica profesional a decenas de estudiantes **sin necesidad de configurar un servidor SMTP ni pagar servicios de terceros (como SendGrid o Mailgun)**.
+Opcional pero recomendado. Convierte una hoja de cálculo del docente en la "base de datos" del curso **sin servidores propios ni costos**: cada docente instala su copia en su propio Google Drive.
 
-#### 💡 ¿Por qué Google Apps Script es la mejor estrategia?
-1. 💰 **Costo Cero Absoluto:** Funciona directamente sobre la infraestructura de Google.
-2. 📬 **Entregabilidad Garantizada:** Los correos salen directamente desde tu cuenta de Gmail o cuenta institucional de Google Workspace para Educación (`@tuuniversidad.edu`), por lo que **nunca caen en la carpeta de Spam**.
-3. 🔒 **Cero Mantenimiento:** No hay puertos SMTP que abrir, ni certificados SSL o credenciales de servidor que renovar.
-4. 📈 **Límites de Envío Amplios:** Gmail gratuito permite 100 correos diarios y Google Workspace for Education permite hasta 1,500 correos diarios, más que suficiente para cursos de investigación y tesis.
+### Cómo funciona
+- El estudiante inicia sesión con su **carnet de identidad** y una **contraseña** generada por el script y enviada a su correo.
+- Cada **sesión de trabajo** (en cualquier dispositivo) se registra como **una fila** de la hoja `Sesiones`. Si se recarga la página después de más de 30 minutos, o desde otro dispositivo, se crea una fila nueva.
+- Con cada envío, el script recalcula la fila del estudiante en `Resumen` con **las mismas reglas** de `analytics.js` (el archivo se copia tal cual al proyecto de Apps Script).
+- Sin conexión, las sesiones esperan en una cola del dispositivo y se envían al volver internet.
+- **El texto del trabajo y las capturas no se envían nunca**: siguen en el dispositivo y en el paquete .zip.
 
-#### 🚀 Flujo de Trabajo en 4 Pasos:
+### Actualización sin recargar
+Apps Script no puede "empujar" datos al navegador, así que el navegador **pregunta periódicamente** (valores en `config.js`):
+- Editor del estudiante: envía su sesión como máximo cada 60 s y consulta su estado cada 3 min con la pestaña visible. Si aparece una observación nueva sobre **su propio** trabajo, se enciende un punto en el botón de Actividad y Salud.
+- Docente: el panel docente (botón **En vivo**) consulta cada 60 s. Las alertas nuevas encienden un **punto rojo** en "En vivo" y en el botón "Panel Docente" del editor **solo en los navegadores donde está guardada la clave docente**. Al abrir el detalle de un estudiante, sus alertas quedan marcadas como vistas.
+- Si ninguna página del docente está abierta, los datos se siguen acumulando en la hoja; también puede consultarse directamente la hoja `Resumen`.
 
-```plaintext
-[Dashboard Docente] ➔ Exportar CSV ➔ Pegar en Google Sheets ➔ Extensiones > Apps Script (codigo_apps_script.gs) ➔ Menú '🎓 Eye on the Sky' > Enviar
-```
+### Qué se guarda en cada fila de `Sesiones`
+| Grupo | Columnas |
+| :--- | :--- |
+| Identificación | Recibido, Carnet, Estudiante, ID proyecto, Título, ID sesión, N.º sesión |
+| Tiempo | Inicio, Fin, Duración (min), Minutos de tecleo |
+| Dispositivo | Dispositivo, Entrada (teclado/táctil), ID dispositivo, Versión app |
+| Avance | Palabras al inicio, Palabras al final, Cambio neto, Palabras tecleadas |
+| Proceso | Car. tecleados, Car. borrados, Tasa de revisión, Ediciones no lineales, Pausas 2-30 s |
+| Pegados | Sin declarar / Notas / Citas textuales / IA declarada (cantidad y caracteres de cada tipo) |
+| Documento al sincronizar | % tecleado, % notas, % citas, % IA, % sin declarar, Fuentes, Fuentes con captura, Capturas |
+| Biometría | Muestras, Consistencia (solo teclado físico) |
+| Detalle (JSON) | La sesión completa compacta: pegados con fragmento de ≤ 160 caracteres, línea de tiempo (≤ 150 puntos), etc. Siempre < 45 000 caracteres |
+| Instantánea (JSON) | Conteos de procedencia y fuentes usados para calcular el resumen |
 
-1. **Exportar el CSV:** Haz clic en **"Exportar reporte CSV"** en el dashboard docente.
-2. **Pegar en tu Google Sheets:** Abre la hoja de cálculo de Google que compartes con tus alumnos y pega los datos del CSV. Asegúrate de tener una columna llamada `Correo` o `Email`.
-3. **Instalar el script:**
-   - En tu Google Sheets, ve al menú superior: `Extensiones > Apps Script`.
-   - Borra cualquier texto que aparezca y pega el contenido del archivo [`codigo_apps_script.gs`](file:///d:/Git/app-eye-on-the-sky/codigo_apps_script.gs) (disponible en la raíz de este proyecto o directamente desde el botón *"Copiar código de Apps Script"* en el modal del dashboard).
-   - Guarda con <kbd>Ctrl</kbd> + <kbd>S</kbd>.
-4. **Ejecutar el envío:**
-   - Vuelve a tu hoja de cálculo y recarga la página (<kbd>F5</kbd>).
-   - Aparecerá el menú: **🎓 Eye on the Sky**.
-   - Haz clic en **"📧 Enviar reportes gráficos a estudiantes"** (o en *"👁️ Vista previa del correo"* para inspeccionar la fila activa).
+### Seguridad y privacidad
+- Las contraseñas se guardan como huella SHA-256 con un secreto del script (nunca en texto). El estudiante recibe un **token firmado** válido 180 días; regenerar su contraseña invalida sus tokens.
+- 6 intentos fallidos por carnet bloquean el inicio de sesión durante 15 minutos.
+- Un estudiante solo puede leer su propio estado y no puede escribir sesiones de otro carnet.
+- La clave docente y el secreto viven en las *Propiedades del script*, no en el código público.
+- El carnet de identidad es un dato personal: la hoja debe quedar **privada** en el Drive del docente. Informa a los estudiantes qué se registra.
 
-#### 💌 Diseño del Correo Gráfico que recibe el Estudiante:
-El correo enviado utiliza una plantilla HTML responsive compatible con Gmail, Outlook y teléfonos móviles, que incluye:
-- Encabezado institucional oscuro con tipografía limpia.
-- Barra de progreso coloreada con la **Tasa de Escritura Manual** (verde, amarillo o rojo).
-- Tarjetas métricas con palabras totales, sesiones de trabajo, consistencia biométrica y fuentes respaldadas con capturas.
-- Diagnóstico docente personalizado según las alertas detectadas.
+### Instalación
+Sigue los pasos del encabezado de `codigo_apps_script.gs` (también en el panel docente › "Enviar correos (Apps Script)"). En resumen: hoja nueva › pegar `codigo_apps_script.gs` y `analytics.js` › ⚙️ Preparar hojas › pegar la lista (Carnet, Estudiante, Correo) › publicar como aplicación web › copiar la URL en `config.js` › 🔑 Generar contraseñas › 🔐 Ver clave docente › conectar el panel con **En vivo**.
 
-#### ✉️ Envío Individual Directo (Mailto):
-Si prefieres enviar retroalimentación puntual a un alumno específico desde tu cliente de correo (Thunderbird, Outlook o webmail), en el panel de detalle de cada estudiante dispones del botón **"✉️ Enviar correo"**, el cual abre tu cliente con el asunto y el resumen del progreso ya redactados.
-
----
-
-### 🧪 6.8. Banco de Pruebas: Estudiantes Demo
-
-El repositorio incluye la carpeta [`estudiantes_demo/`](file:///d:/Git/app-eye-on-the-sky/estudiantes_demo/) con 6 expedientes académicos reales y extensos (~1,200 a 2,400 palabras) para probar y demostrar el Dashboard de inmediato:
-
-| Archivo Demo | Estudiante | Tema de Investigación | Diagnóstico Esperado |
-| :--- | :--- | :--- | :--- |
-| `camila_morales_documento.json` | Camila Morales Flores | Humedales altoandinos | 🟢 **Excelente:** 4 sesiones, 3 días, 96% manual, huella 96%, 6 fuentes con captura. |
-| `diego_arismendi_documento.json` | Diego Arismendi | Inteligencia Artificial en Diagnóstico | 🚨 **Alerta crítica:** 1 sola sesión, 88% pegado masivo, 0 fuentes con captura. |
-| `lucia_paredes_documento.json` | Lucía Paredes Castro | Baterías de Ion-Litio | 🚨 **Alerta crítica de Biometría:** Cambio de autor en sesión 3 (huella cayó a 48%). |
-| `mateo_quintana_documento.json` | Mateo Quintana | Microplásticos marinos | 🟢 **Sin alertas:** 3 sesiones progresivas, 94% manual, huella 94%, 5 fuentes con captura. |
-| `valentina_herrera_documento.json` | Valentina Herrera | Energías renovables | ⚠️ **Advertencia:** Documento extenso realizado en 1 solo día con ritmo acelerado. |
-| `andres_salazar_documento.json` | Andrés Salazar | Algoritmos de encriptación | 🟢 **En progreso:** 2 sesiones regulares, calibración biométrica completada con éxito. |
-
-> [!TIP]
-> **Prueba rápida:** Abre [`dashboard.html`](file:///d:/Git/app-eye-on-the-sky/dashboard.html) y arrastra los 6 archivos de la carpeta `estudiantes_demo/` para visualizar cómo el dashboard clasifica instantáneamente los casos saludables de los casos fraudulentos.
+> [!NOTE]
+> Con `WEB_APP_URL` vacío en `config.js`, todo funciona como antes, sin servidor (paquete .zip + CSV).
 
 ---
 
-## 🛡️ 7. Seguridad y Criptografía (Anti-Manipulación)
+## 🧪 7. ¿Qué puede y qué no puede demostrar la telemetría?
 
-Para evitar que un estudiante altere su archivo `documento.json` con un editor de texto para falsear sesiones, palabras o métricas biométricas:
+**Sirve como evidencia del proceso, no como prueba de autoría.**
 
-```mermaid
-flowchart TD
-    A["📄 Estado del Proyecto: Sesiones, Palabras, Biometría"] --> B["🔤 Serialización JSON canónica"]
-    B --> C["🧂 Salting con clave de integridad de aplicación"]
-    C --> D["⚙️ Web Cryptography API: SHA-256 Digest"]
-    D --> E["🔒 Firma digital almacenada en _signature"]
-    E --> F["📥 Docente carga archivo en Dashboard"]
-    F --> G["🔄 Dashboard recalcula SHA-256 de forma independiente"]
-    G --> H{"⚖️ ¿Firma calculada == Firma guardada?"}
-    H -- "✅ Sí" --> I["🟢 Integridad Validada: Manuscrito Legítimo"]
-    H -- "❌ No" --> J["🚨 Alerta: Posible manipulación externa del archivo JSON"]
+| Detecta bien | No detecta |
+| :--- | :--- |
+| Copiar y pegar masivo sin declarar | Copiar a mano (teclear) un texto generado por IA que se lee en otra pantalla, salvo como "patrón de transcripción" (indicio débil) |
+| Documentos hechos en una sola sesión o noche | Programas que simulan pulsaciones de teclado |
+| Capturas cambiadas después de adjuntarlas | Que otra persona escriba en la cuenta del estudiante con un ritmo parecido |
+| Pegados de IA declarados por el estudiante | Edición manual del JSON por alguien que lea `editor.js` (la clave de firma es pública) |
 
-    style A fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff
-    style B fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff
-    style C fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff
-    style D fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff
-    style E fill:#312e81,stroke:#a78bfa,stroke-width:2px,color:#ffffff
-    style F fill:#06231c,stroke:#34d399,stroke-width:2px,color:#ffffff
-    style G fill:#06231c,stroke:#34d399,stroke-width:2px,color:#ffffff
-    style H fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#ffffff
-    style I fill:#064e3b,stroke:#10b981,stroke-width:3px,color:#ffffff
-    style J fill:#7f1d1d,stroke:#ef4444,stroke-width:3px,color:#ffffff
-
-    linkStyle default stroke:#cbd5e1,stroke-width:2.5px
-```
+Recomendación de uso:
+1. Usa las métricas para **decidir con quién conversar**, no para sancionar.
+2. La validación más sólida es humana: pide al estudiante que explique o reescriba en clase un párrafo elegido al azar, o que muestre cómo llegó a una idea.
+3. Fomenta la declaración: es preferible un 10 % de IA declarada que un 0 % falso.
+4. Pide entregas parciales en fechas distintas: el crecimiento del documento entre entregas es difícil de falsificar.
 
 ---
 
-## 📂 8. Estructura de Archivos del Repositorio
+## 🛡️ 8. Integridad y Criptografía
+
+- Cada guardado calcula una firma SHA-256 del proyecto (`_signature`) con una clave fija de la aplicación. **Detecta ediciones manuales casuales del JSON**, pero no es criptografía fuerte: la clave está en el código público.
+- Cada captura tiene su huella SHA-256 (`captures[nombre].sha256`); el panel docente la recalcula desde el .zip.
+
+---
+
+## 📂 9. Estructura de Archivos del Repositorio
 
 ```plaintext
 app-eye-on-the-sky/
-│
-├── 📄 index.html                  # Interfaz del Editor del Estudiante
-├── 📄 dashboard.html              # Interfaz del Dashboard del Docente
-├── 📄 codigo_apps_script.gs       # Script de Google Apps Script para envío masivo de correos HTML
-├── 📄 README.md                   # Manual integral de usuario y arquitectura técnica
-│
-├── 📁 css/
-│   └── 🎨 styles.css              # Sistema de diseño (Dark/Light, Glassmorphism, mapa de colores)
-│
-├── 📁 js/
-│   ├── ⚙️ editor.js               # Motor del editor Quill, File System API, biometría y sonidos
-│   └── 📊 dashboard.js            # Motor analítico, gráficos Chart.js, auditoría y Apps Script modal
-│
-├── 📁 estudiantes_demo/           # 6 casos de prueba reales con textos académicos completos
-│   ├── 📄 camila_morales_documento.json
-│   ├── 📄 diego_arismendi_documento.json
-│   ├── 📄 lucia_paredes_documento.json
-│   ├── 📄 mateo_quintana_documento.json
-│   ├── 📄 valentina_herrera_documento.json
-│   └── 📄 andres_salazar_documento.json
-│
-└── 📁 Sounds/                     # Efectos de audio gamificados (lista blanca estricta)
-    ├── 🔊 typing_keystroke.mp3
-    ├── 🔊 paste_warning.mp3
-    ├── 🔊 citation_success.mp3
-    ├── 🔊 session_start.mp3
-    ├── 🔊 milestone_words.mp3
-    └── 🔊 calibration_complete.mp3
+├── config.js                # ÚNICO archivo a editar por cada docente (URL del Apps Script)
+├── index.html               # Editor del estudiante
+├── cloud.js                 # Inicio de sesión, envío de sesiones, cola sin conexión, avisos en vivo
+├── editor.js                # Lógica del editor (Quill, guardado, telemetría, pegados, capturas)
+├── analytics.js             # Métricas y alertas COMPARTIDAS por editor y dashboard (POLICY)
+├── captures.js              # Almacén portable de capturas (IndexedDB, compresión, SHA-256)
+├── dashboard.html           # Panel docente
+├── dashboard.js             # Carga de .zip/.json, verificación, gráficos, CSV
+├── codigo_apps_script.gs    # Apps Script: hojas, contraseñas, servicio web, resumen y correos
+├── styles.css               # Estilos (claro/oscuro, procedencia, impresión)
+├── sw.js                    # Service Worker (uso sin conexión)
+├── manifest.json, icon.svg  # Aplicación instalable (PWA)
+├── sounds/                  # Efectos de sonido
+└── estudiantes_demo/        # 6 proyectos de ejemplo
 ```
 
----
-
-## 🌐 9. Requisitos y Compatibilidad de Navegadores
-
-| Dispositivo / Navegador | Soporte Editor (.json y Carpetas) | Autoguardado | Soporte Dashboard Docente |
-| :--- | :---: | :---: | :---: |
-| 💻 **Google Chrome / Edge en PC** | 🟢 **100% Nativo** (Carpetas locales y .json) | 🟢 Disco duro local (cada 30s) | 🟢 **100% Nativo** |
-| 📱 **Apple iPhone / iPad (iOS Safari)** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
-| 🤖 **Android (Chrome Mobile)** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
-| 🌐 **Mozilla Firefox / Safari en Mac** | 🟢 **100% Compatible** (.json y texto pegado) | 🟢 Almacenamiento local (`localStorage`) | 🟢 **100% Nativo** |
+Formato del paquete `.zip`: `proyecto.json` + `capturas/<nombre>` + `LEEME.txt`.
 
 ---
 
-## 🤝 10. Contribuciones y Soporte
+## 🌐 10. Requisitos y Compatibilidad
+
+| Navegador | Editor | Guardado | Capturas | Carpeta local / guardar en el mismo archivo |
+| :--- | :---: | :---: | :---: | :---: |
+| Chrome / Edge en PC | ✅ | Navegador + carpeta o archivo | ✅ | ✅ |
+| Firefox / Safari en PC | ✅ | Navegador | ✅ | ❌ (usar paquete .zip) |
+| Android (Chrome) | ✅ | Navegador | ✅ | ❌ (usar paquete .zip) |
+| iPhone / iPad (Safari, Chrome) | ✅ | Navegador | ✅ | ❌ (usar paquete .zip) |
+
+La primera carga necesita conexión para descargar Quill, JSZip y docx; después funciona sin conexión.
+
+---
+
+## 🤝 11. Contribuciones y Soporte
 
 Las sugerencias, mejoras y reportes de errores son bienvenidos:
 1. Haz un **Fork** de este repositorio.

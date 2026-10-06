@@ -37,6 +37,11 @@
         <svg id="dash-theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         <svg id="dash-theme-icon-dark" class="hidden" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+      <button class="btn btn-sm dot-host" id="btn-live" title="Ver en vivo el registro del curso (Google Sheets)">
+        <span class="notify-dot teacher-dot" aria-hidden="true"></span>
+        <span id="live-indicator" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-muted);"></span>
+        <span id="live-label">En vivo</span>
+      </button>
       <button class="btn btn-sm" id="btn-export-report">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
         Exportar reporte CSV
@@ -54,12 +59,16 @@
          ZONA DE CARGA DE ARCHIVOS JSON
     ══════════════════════════════════════════════ -->
     <div id="upload-zone" role="button" tabindex="0" aria-label="Cargar archivos JSON de estudiantes">
-      <input type="file" id="json-file-input" multiple accept=".json" />
+      <input type="file" id="json-file-input" multiple accept=".zip,.json,application/zip,application/json" />
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 12px; display: block; color: var(--accent); opacity: 0.7"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <h2>Cargar proyectos de estudiantes</h2>
-      <p>Arrastra uno o varios archivos <strong>documento.json</strong> aquí, o haz clic para seleccionarlos.</p>
-      <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">Puedes cargar todos los archivos del curso de una sola vez.</p>
+      <p>Arrastra los <strong>paquetes .zip</strong> de tus estudiantes (o sus archivos <strong>.json</strong>) aquí, o haz clic para seleccionarlos.</p>
+      <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">Con el paquete .zip se verifican además las capturas de evidencia (huella SHA-256). Puedes cargar todo el curso de una sola vez.</p>
     </div>
+
+    <!-- Alertas nuevas del registro en vivo -->
+    <div id="live-banner" class="hidden" style="margin-top: 16px; padding: 12px 16px; border-radius: 10px; background: var(--danger-light); border: 1px solid rgba(229,57,53,0.3);"></div>
+    <div id="live-inactive" class="hidden text-sm text-muted" style="margin-top: 10px;"></div>
 
     <!-- ══════════════════════════════════════════════
          PANEL PRINCIPAL (oculto hasta cargar datos)
@@ -75,13 +84,13 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px;">
         <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-sm);">
           <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 14px;">
-            Distribución: Escritura manual vs. pegado
+            Procedencia del texto final por estudiante
           </div>
           <canvas id="chart-manual-vs-paste" height="200"></canvas>
         </div>
         <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: var(--shadow-sm);">
           <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 14px;">
-            Sesiones de trabajo por estudiante
+            Sesiones y días de trabajo por estudiante
           </div>
           <canvas id="chart-sessions" height="200"></canvas>
         </div>
@@ -108,12 +117,11 @@
               <th data-col="student_name">Estudiante ↕</th>
               <th data-col="total_sessions">Sesiones ↕</th>
               <th data-col="total_days_active">Días activos ↕</th>
-              <th data-col="manual_ratio">% Manual ↕</th>
-              <th data-col="total_chars_pasted">Pegados ↕</th>
-              <th data-col="sources_count">Fuentes ↕</th>
-              <th data-col="sources_with_screenshot">Con captura ↕</th>
+              <th data-col="typed_share">% Tecleado ↕</th>
+              <th data-col="undeclared_share">Sin declarar ↕</th>
+              <th data-col="sources_with_screenshot">Fuentes c/ captura ↕</th>
               <th data-col="word_count">Palabras ↕</th>
-              <th data-col="biometric_score">Biometría ↕</th>
+              <th data-col="biometric_worst">Biometría ↕</th>
               <th>Alerta</th>
               <th>Acciones</th>
             </tr>
@@ -179,21 +187,15 @@
     <!-- Pasos de configuración -->
     <div style="background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
       <h3 style="font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; color: var(--primary);">
-        🚀 Flujo de Trabajo en 4 Pasos:
+        🚀 Instalación del registro del curso (una sola vez, ~10 minutos)
       </h3>
       <ol style="margin: 0; padding-left: 20px; font-size: 0.83rem; line-height: 1.6; color: var(--text-main);">
-        <li>
-          <strong>Exporta el CSV del Dashboard:</strong> Haz clic en el botón <em>"Exportar reporte CSV"</em> en este panel docente.
-        </li>
-        <li>
-          <strong>Importa o pega en tu Google Sheets:</strong> Abre tu Google Sheets donde tienes la lista de estudiantes e importa el archivo CSV (o copia y pega sus filas). Asegúrate de tener una columna llamada <code>Correo</code> o <code>Email</code> con los correos de tus estudiantes.
-        </li>
-        <li>
-          <strong>Pega el script en Google Sheets:</strong> En tu Google Sheets, ve a <code>Extensiones &gt; Apps Script</code>, borra el código que aparezca y pega el script provisto abajo. Guarda con <kbd>Ctrl+S</kbd>.
-        </li>
-        <li>
-          <strong>Envía con un clic:</strong> Recarga tu hoja de cálculo (<kbd>F5</kbd>). Verás un nuevo menú superior llamado <strong>🎓 Eye on the Sky</strong>. Elige <strong>"📧 Enviar reportes gráficos a estudiantes"</strong>.
-        </li>
+        <li>Crea una hoja de cálculo nueva en tu Google Drive y abre <code>Extensiones &gt; Apps Script</code>.</li>
+        <li>Pega <strong>codigo_apps_script.gs</strong> en <code>Código.gs</code>. Luego <code>+ › Secuencia de comandos</code> llamada <code>analytics</code> y pega <strong>analytics.js</strong> (mismas reglas de alertas que el editor). Guarda.</li>
+        <li>Recarga la hoja: menú <strong>🎓 Eye on the Sky › ⚙️ Preparar hojas</strong>. Pega tu lista en <code>Estudiantes</code> (Carnet, Estudiante, Correo).</li>
+        <li>En Apps Script: <code>Implementar › Nueva implementación › Aplicación web</code> (Ejecutar como: <em>Yo</em> · Acceso: <em>Cualquier usuario</em>). Copia la URL <code>/exec</code> en <code>config.js</code> del editor.</li>
+        <li>Menú <strong>🔑 Generar contraseñas y enviarlas por correo</strong>. Con <strong>🔐 Ver clave docente</strong> conecta este panel con el botón <strong>En vivo</strong>.</li>
+        <li>Para enviar reportes: <strong>📧 Enviar reportes pendientes</strong> (salen de la hoja <code>Resumen</code>; un reporte sin cambios no se reenvía).</li>
       </ol>
     </div>
 
@@ -203,6 +205,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         Copiar código de Apps Script
       </button>
+      <button class="btn btn-sm" id="btn-copy-analytics">Copiar analytics.js</button>
       <a href="codigo_apps_script.gs" download="codigo_apps_script.gs" class="btn btn-sm btn-ghost" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Descargar archivo .gs
@@ -237,7 +240,7 @@
             <!-- Barra de Redacción Manual -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 6px;">
-                <span>Tasa de Escritura Manual</span>
+                <span>Texto tecleado por ti</span>
                 <span style="color: #16a34a; font-size: 13px;">96% Manual</span>
               </div>
               <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden;">
@@ -256,8 +259,8 @@
                 <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">En 3 días de trabajo</div>
               </div>
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
-                <div style="font-size: 18px; font-weight: 800; color: #16a34a;">96%</div>
-                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Huella biométrica autor</div>
+                <div style="font-size: 18px; font-weight: 800; color: #16a34a;">0%</div>
+                <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Pegado sin declarar</div>
               </div>
               <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center;">
                 <div style="font-size: 18px; font-weight: 800; color: #16a34a;">6 / 6</div>
@@ -296,9 +299,31 @@
   </div>
 </div>
 
+<!-- MODAL: CONECTAR EN VIVO -->
+<div class="modal-overlay hidden" id="modal-live" role="dialog" aria-modal="true" aria-labelledby="modal-live-title">
+  <div class="modal" style="max-width: 480px;">
+    <h2 id="modal-live-title" style="font-size: 1.05rem; font-weight: 700; margin-bottom: 8px;">Registro del curso en vivo</h2>
+    <p class="text-sm text-muted" style="margin-bottom: 14px;">Los datos vienen de tu Google Sheets. En la hoja: menú 🎓 Eye on the Sky › 🔐 Ver clave docente y URL del servidor.</p>
+    <label class="form-label" for="live-url">URL del servidor (termina en /exec)</label>
+    <input class="form-input" id="live-url" type="url" placeholder="https://script.google.com/macros/s/…/exec" style="margin-bottom: 10px;" />
+    <label class="form-label" for="live-key">Clave docente</label>
+    <input class="form-input" id="live-key" type="password" placeholder="DOC-…" />
+    <p class="text-sm text-muted" style="margin-top: 8px;">La clave se guarda solo en este navegador. Con ella, el botón "Panel Docente" del editor también mostrará el punto rojo en este equipo.</p>
+    <p class="text-sm" id="live-error" style="color: var(--danger); min-height: 1.2em;"></p>
+    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
+      <button class="btn btn-ghost" id="live-disconnect">Desconectar</button>
+      <button class="btn" id="live-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="live-connect">Conectar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
-<script src="dashboard.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="config.js?v=3.0"></script>
+<script src="analytics.js?v=3.0"></script>
+<script src="dashboard.js?v=3.0"></script>
 <!-- Registro de Service Worker para soporte Offline / PWA -->
 <script>
   if ('serviceWorker' in navigator) {

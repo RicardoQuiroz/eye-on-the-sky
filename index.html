@@ -15,7 +15,7 @@
   <!-- Quill editor -->
   <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
   <!-- Estilos de la aplicación -->
-  <link rel="stylesheet" href="styles.css?v=1.9" />
+  <link rel="stylesheet" href="styles.css?v=3.0" />
 </head>
 <body>
 
@@ -48,7 +48,8 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </button>
 
-      <button class="btn btn-ghost btn-sm btn-icon" id="btn-toggle-tele" title="Panel de actividad y salud">
+      <button class="btn btn-ghost btn-sm btn-icon dot-host" id="btn-toggle-tele" title="Panel de actividad y salud">
+        <span class="notify-dot student-dot" aria-hidden="true"></span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       </button>
 
@@ -98,15 +99,20 @@
             Exportar bibliografía (.ris para Zotero)
           </div>
           <div class="dropdown-separator"></div>
+          <div class="dropdown-item" id="export-bundle" title="Documento + capturas en un solo archivo: para cambiar de dispositivo y para entregar al docente">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+            <span><strong>Paquete del proyecto (.zip)</strong><br><small style="color: var(--text-muted);">Documento + capturas · cambiar de equipo y entregar</small></span>
+          </div>
           <div class="dropdown-item" id="export-json">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
-            Guardar copia del proyecto (.json)
+            Solo datos (.json, sin capturas)
           </div>
         </div>
       </div>
 
       <!-- Enlace directo al Panel Docente -->
-      <a href="dashboard.html" class="btn btn-ghost btn-sm" title="Ir al panel docente para analizar entregas en lote" style="text-decoration: none; color: var(--accent); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+      <a href="dashboard.html" id="link-panel-docente" class="btn btn-ghost btn-sm dot-host" title="Ir al panel docente para analizar entregas en lote" style="text-decoration: none; color: var(--accent); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <span class="notify-dot teacher-dot" aria-hidden="true"></span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span>Panel Docente</span>
       </a>
@@ -117,7 +123,7 @@
         <span id="open-folder-label">Abrir / Crear carpeta</span>
       </button>
 
-      <input type="file" id="input-load-json-direct" accept=".json,application/json,text/plain,*/*" class="hidden" />
+      <input type="file" id="input-load-json-direct" accept=".zip,.json,application/zip,application/json,text/plain,*/*" class="hidden" />
     </div>
 
     <!-- Accesos directos coloreados para Fuentes, TOC y Salud/Actividad -->
@@ -138,7 +144,8 @@
           <line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
       </button>
-      <button type="button" class="btn-nav-shortcut nav-shortcut-tele" id="btn-nav-tele" title="Panel de Actividad y Salud (Telemetría)" aria-label="Abrir panel de actividad y salud">
+      <button type="button" class="btn-nav-shortcut nav-shortcut-tele dot-host" id="btn-nav-tele" title="Panel de Actividad y Salud (Telemetría)" aria-label="Abrir panel de actividad y salud">
+        <span class="notify-dot student-dot" aria-hidden="true"></span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
         </svg>
@@ -146,7 +153,8 @@
     </div>
 
     <!-- Botón Menú Hamburguesa (Móviles / Pantallas pequeñas) -->
-    <button class="btn btn-ghost btn-sm btn-icon" id="btn-hamburger-menu" title="Menú de opciones" aria-label="Abrir menú de opciones">
+    <button class="btn btn-ghost btn-sm btn-icon dot-host" id="btn-hamburger-menu" title="Menú de opciones" aria-label="Abrir menú de opciones">
+      <span class="notify-dot teacher-dot" aria-hidden="true"></span>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="3" y1="12" x2="21" y2="12"></line>
         <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -266,7 +274,7 @@
             </div>
             <div class="mob-item-text">
               <div class="mob-item-label">Guardar ahora</div>
-              <div class="mob-item-desc">Ver estadísticas de la sesión actual</div>
+              <div class="mob-item-desc">Ver estadísticas acumuladas del proyecto</div>
             </div>
             <span class="mob-item-badge" style="color: var(--accent);">💾</span>
           </button>
@@ -276,8 +284,8 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
             </div>
             <div class="mob-item-text">
-              <div class="mob-item-label">Descargar copia (.json)</div>
-              <div class="mob-item-desc">Respaldo firmado para entrega docente</div>
+              <div class="mob-item-label">Descargar paquete (.zip)</div>
+              <div class="mob-item-desc">Documento + capturas: otro equipo o entrega</div>
             </div>
           </button>
 
@@ -286,8 +294,8 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             </div>
             <div class="mob-item-text">
-              <div class="mob-item-label">Abrir archivo .json existente</div>
-              <div class="mob-item-desc">Cargar un trabajo previo desde el dispositivo</div>
+              <div class="mob-item-label">Abrir proyecto (.zip o .json)</div>
+              <div class="mob-item-desc">Continuar un trabajo traído de otro dispositivo</div>
             </div>
           </button>
 
@@ -340,7 +348,8 @@
         <!-- Grupo: Docencia -->
         <div class="mobile-menu-group">
           <div class="mobile-menu-group-title">Docencia</div>
-          <a href="dashboard.html" class="mobile-menu-item" style="text-decoration: none; color: inherit;">
+          <a href="dashboard.html" class="mobile-menu-item dot-host" style="text-decoration: none; color: inherit;">
+            <span class="notify-dot teacher-dot" aria-hidden="true"></span>
             <div class="mob-item-icon" style="color: var(--accent);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             </div>
@@ -521,14 +530,72 @@
         </button>
       </div>
 
-      <!-- Salud del manuscrito -->
+      <!-- Registro del curso (Google Sheets) -->
+      <div class="tele-section" id="cloud-section" style="display: none;">
+        <div class="tele-title">Registro del curso</div>
+        <div class="text-sm" id="cloud-user" style="font-weight: 600; font-size: 0.78rem;"></div>
+        <div class="text-sm text-muted" id="cloud-status" style="font-size: 0.74rem; margin: 4px 0 8px; line-height: 1.35;"></div>
+        <button class="btn btn-primary btn-sm" id="cloud-login-btn" style="display: none;">Iniciar sesión</button>
+        <button class="btn btn-ghost btn-sm" id="cloud-logout-btn" style="display: none; font-size: 0.72rem;">Cerrar sesión en este dispositivo</button>
+      </div>
+
+      <!-- Salud del manuscrito: ACUMULADA (todas las sesiones y dispositivos) -->
       <div id="health-bar-container" class="tele-section">
         <div class="health-label">
-          <span>Escritura manual</span>
+          <span>Texto tecleado por ti</span>
           <span id="health-percent">—</span>
         </div>
         <div class="health-track">
           <div class="health-fill" id="health-fill" style="width: 0%"></div>
+        </div>
+        <p class="text-sm text-muted" style="font-size: 0.7rem; margin-top: 6px; line-height: 1.35;">
+          Medido sobre el texto que queda en el documento, sumando todas tus sesiones en todos tus dispositivos. Es lo mismo que verá tu docente.
+        </p>
+        <div class="prov-bar" id="prov-bar" aria-hidden="true"></div>
+        <div id="prov-legend" style="margin-top: 6px;"></div>
+      </div>
+
+      <!-- Lo que verá el docente -->
+      <div class="tele-section">
+        <div class="tele-title">Lo que verá tu docente</div>
+        <div id="tele-alerts"></div>
+      </div>
+
+      <!-- Totales históricos -->
+      <div class="tele-section">
+        <div class="tele-title">Total del proyecto</div>
+        <div class="text-sm text-muted" id="tele-totals-source" style="font-size: 0.68rem; margin-bottom: 6px;"></div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Sesiones de trabajo</span>
+          <span class="tele-stat-value" id="tele-total-sessions">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Días de trabajo</span>
+          <span class="tele-stat-value" id="tele-days-active">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Palabras tecleadas</span>
+          <span class="tele-stat-value" id="tele-total-typed">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Pegados declarados</span>
+          <span class="tele-stat-value" id="tele-pastes-declared">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Pegados sin declarar</span>
+          <span class="tele-stat-value" id="tele-pastes-undeclared">0</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted" title="Caracteres borrados por cada 100 tecleados: escribir y corregir es normal al componer">Tasa de revisión</span>
+          <span class="tele-stat-value" id="tele-revision">—</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Fuentes con captura</span>
+          <span class="tele-stat-value" id="tele-sources-with-img">0/0</span>
+        </div>
+        <div class="tele-stat" style="align-items: flex-start;">
+          <span class="text-sm text-muted">Dispositivos</span>
+          <span class="tele-stat-value text-sm" id="tele-devices" style="font-size: 0.72rem; text-align: right; max-width: 60%;">—</span>
         </div>
       </div>
 
@@ -536,39 +603,34 @@
       <div class="tele-section">
         <div class="tele-title">Sesión actual</div>
         <div class="tele-stat">
-          <span class="text-sm text-muted">Palabras escritas</span>
+          <span class="text-sm text-muted">Palabras tecleadas</span>
           <span class="tele-stat-value" id="tele-words-typed">0</span>
         </div>
         <div class="tele-stat">
-          <span class="text-sm text-muted">Eventos de pegado</span>
+          <span class="text-sm text-muted">Pegados</span>
           <span class="tele-stat-value" id="tele-paste-count">0</span>
         </div>
         <div class="tele-stat">
-          <span class="text-sm text-muted">Tiempo activo</span>
+          <span class="text-sm text-muted">Tiempo</span>
           <span class="tele-stat-value" id="tele-session-time">00:00</span>
+        </div>
+        <div class="tele-stat">
+          <span class="text-sm text-muted">Este dispositivo</span>
+          <span class="tele-stat-value text-sm" id="tele-device-label" style="font-size: 0.72rem;">—</span>
         </div>
       </div>
 
-      <!-- Totales históricos -->
+      <!-- Autor del trabajo -->
       <div class="tele-section">
-        <div class="tele-title">Total del proyecto</div>
-        <div class="tele-stat">
-          <span class="text-sm text-muted">Sesiones de trabajo</span>
-          <span class="tele-stat-value" id="tele-total-sessions">0</span>
-        </div>
-        <div class="tele-stat">
-          <span class="text-sm text-muted">Fuentes con captura</span>
-          <span class="tele-stat-value" id="tele-sources-with-img">0/0</span>
-        </div>
-        <div class="tele-stat">
-          <span class="text-sm text-muted">Días de trabajo</span>
-          <span class="tele-stat-value" id="tele-days-active">0</span>
-        </div>
+        <div class="tele-title">Autor del trabajo</div>
+        <input class="form-input" id="author-name-input" type="text" placeholder="Nombre y apellido" style="margin-bottom: 6px; font-size: 0.8rem;" />
+        <input class="form-input" id="author-email-input" type="email" placeholder="correo@universidad.edu" style="font-size: 0.8rem;" />
+        <p class="text-sm text-muted" style="font-size: 0.7rem; margin-top: 4px;">Tu docente usa este correo para enviarte el reporte.</p>
       </div>
 
       <!-- Dinámica de tecleo / Biometría -->
       <div class="tele-section" id="tele-biometrics-section">
-        <div class="tele-title">Identidad Biométrica</div>
+        <div class="tele-title">Ritmo de tecleo (informativo)</div>
         <div class="tele-stat">
           <span class="text-sm text-muted">Estado huella</span>
           <span class="tele-stat-value text-sm" id="tele-bio-status" style="font-size: 0.76rem; color: var(--accent);">Calibrando (0/250)</span>
@@ -599,22 +661,13 @@
           Código de colores que visualiza el origen de cada fragmento del manuscrito:
         </p>
         <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.78rem;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: transparent; border: 1.5px solid var(--text-muted); flex-shrink: 0;"></span>
-            <span><strong>Escritura manual:</strong> Texto limpio (100% genuino)</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: rgba(74, 108, 247, 0.22); border: 1px solid rgba(74, 108, 247, 0.5); flex-shrink: 0;"></span>
-            <span><strong>Pegado inicial:</strong> Estructura base sin penalizar</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: rgba(229, 57, 53, 0.22); border: 1px solid rgba(229, 57, 53, 0.5); flex-shrink: 0;"></span>
-            <span><strong>Texto pegado:</strong> Fragmento externo monitoreado</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: rgba(139, 92, 246, 0.22); border: 1px solid rgba(139, 92, 246, 0.5); flex-shrink: 0;"></span>
-            <span><strong>Cita bibliográfica:</strong> Referencia académica</span>
-          </div>
+          <div class="legend-row"><span class="legend-swatch" style="background: transparent; border: 1.5px solid var(--text-muted);"></span><span><strong>Tecleado:</strong> texto limpio escrito por ti</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background: rgba(74, 108, 247, 0.30);"></span><span><strong>Notas propias:</strong> pegado declarado (tus apuntes)</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background: rgba(16, 185, 129, 0.30);"></span><span><strong>Cita textual:</strong> pegado declarado de una fuente</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background: rgba(245, 158, 11, 0.35);"></span><span><strong>IA declarada:</strong> texto generado con IA</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background: rgba(229, 57, 53, 0.30);"></span><span><strong>Pegado sin declarar:</strong> se reporta al docente</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background: rgba(139, 92, 246, 0.30);"></span><span><strong>Referencia:</strong> cita bibliográfica insertada</span></div>
+          <p class="text-sm text-muted" style="font-size: 0.7rem; line-height: 1.35;">"Limpiar formato" no borra estos colores: son el registro de procedencia.</p>
         </div>
       </div>
     </aside>
@@ -765,7 +818,7 @@
           <button class="btn btn-sm btn-ghost text-danger" id="remove-screenshot" style="margin-top: 6px;">Quitar imagen</button>
         </div>
         <p class="text-sm text-muted mt-1" id="screenshot-note">
-          La imagen se copiará a la carpeta <code>capturas/</code> del proyecto. El JSON almacenará solo la ruta relativa.
+          La imagen se guarda en este dispositivo (y en <code>capturas/</code> si hay carpeta vinculada) con su huella SHA-256. Viaja con el proyecto dentro del <strong>paquete .zip</strong>.
         </p>
       </div>
 
@@ -883,15 +936,15 @@
         <div style="position: relative; width: 100%; border-radius: 8px; overflow: hidden;">
           <div class="btn btn-ghost w-full" id="onboard-open-json-visual" style="justify-content: center; padding: 12px; border: 1.5px dashed var(--border); font-size: 0.84rem; display: flex; align-items: center; gap: 8px; box-sizing: border-box; pointer-events: none;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span id="onboard-open-json-text">Abrir archivo .json existente</span>
+            <span id="onboard-open-json-text">Abrir proyecto existente (.zip o .json)</span>
           </div>
-          <input type="file" id="onboard-file-input" accept=".json,application/json,text/plain,*/*" title="Seleccionar archivo .json" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; margin: 0; padding: 0;" />
+          <input type="file" id="onboard-file-input" accept=".zip,.json,application/zip,application/json,text/plain,*/*" title="Seleccionar paquete .zip o archivo .json" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; margin: 0; padding: 0;" />
         </div>
       </div>
 
       <!-- Aviso amigable para dispositivos móviles -->
       <div id="onboard-mobile-notice" style="display: none; margin-top: 10px; padding: 8px 12px; background: rgba(74, 108, 247, 0.08); border: 1px solid rgba(74, 108, 247, 0.2); border-radius: 6px; font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4;">
-        📱 <strong>Modo Móvil (iPhone / Android):</strong> Tu redacción y telemetría se guardan automáticamente en este dispositivo. Puedes descargar tu archivo <code>.json</code> en cualquier momento desde el menú <em>Exportar</em>.
+        📱 <strong>Modo Móvil (iPhone / Android):</strong> Tu redacción y telemetría se guardan automáticamente en este dispositivo. Para seguir en otro equipo, descarga el <strong>paquete .zip</strong> (documento + capturas) desde el menú.
       </div>
 
       <!-- Respaldo móvil: Pegar texto JSON directamente -->
@@ -954,23 +1007,23 @@
         </div>
         <div class="stats-card-item">
           <div class="stats-card-value" id="stats-words-typed">0</div>
-          <div class="stats-card-label">Palabras escritas (sesión)</div>
+          <div class="stats-card-label">Palabras tecleadas (todas las sesiones)</div>
         </div>
         <div class="stats-card-item">
           <div class="stats-card-value" id="stats-manual-ratio">100%</div>
-          <div class="stats-card-label">Escritura manual</div>
+          <div class="stats-card-label">Texto tecleado (documento)</div>
         </div>
         <div class="stats-card-item">
           <div class="stats-card-value" id="stats-session-time">00:00</div>
-          <div class="stats-card-label">Tiempo de sesión</div>
+          <div class="stats-card-label">Sesión actual · total</div>
         </div>
         <div class="stats-card-item">
           <div class="stats-card-value" id="stats-sources-count">0</div>
-          <div class="stats-card-label">Fuentes bibliográficas</div>
+          <div class="stats-card-label">Fuentes con captura</div>
         </div>
         <div class="stats-card-item">
           <div class="stats-card-value" id="stats-paste-events">0</div>
-          <div class="stats-card-label">Eventos de pegado</div>
+          <div class="stats-card-label">Pegados sin declarar / declarados</div>
         </div>
       </div>
 
@@ -981,7 +1034,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn" id="btn-save-stats-download">Descargar copia .json</button>
+      <button class="btn" id="btn-save-stats-download">Descargar paquete .zip</button>
       <button class="btn btn-primary" id="btn-save-stats-close">Continuar redactando</button>
     </div>
   </div>
@@ -1027,6 +1080,89 @@
 </div>
 
 <!-- Contenedor de toasts -->
+<!-- ══════════════════════════════════════════════
+     MODAL: DECLARAR UN PEGADO
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-paste-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-paste-title" style="max-width: 480px;">
+    <div class="modal-header">
+      <h3 id="modal-paste-title">¿Qué acabas de pegar?</h3>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom: 8px;">Pegaste <strong id="paste-declare-words">0 palabras</strong>. Declararlo es honesto y no te penaliza; tu docente verá lo que declares.</p>
+      <blockquote id="paste-declare-excerpt" class="paste-excerpt"></blockquote>
+      <div class="paste-kind-list">
+        <label class="paste-kind-option"><input type="radio" name="paste-kind" value="notes" />
+          <span><strong>Mis propias notas o borrador</strong><br><small>Apuntes, esquemas o texto que escribí en otro lugar (otro dispositivo, Word…)</small></span></label>
+        <label class="paste-kind-option"><input type="radio" name="paste-kind" value="quote" />
+          <span><strong>Cita textual de una fuente</strong><br><small>Fragmento copiado de un artículo o libro registrado en Fuentes</small></span></label>
+        <div id="paste-quote-row" style="display: none; margin: 4px 0 8px 26px;">
+          <select class="form-select" id="paste-quote-source"></select>
+        </div>
+        <label class="paste-kind-option"><input type="radio" name="paste-kind" value="ai" />
+          <span><strong>Texto generado con IA</strong><br><small>ChatGPT, Claude, Gemini u otra herramienta (declarado)</small></span></label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="paste-declare-skip">No declarar</button>
+      <button class="btn btn-primary" id="paste-declare-confirm">Declarar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: INICIO DE SESIÓN (registro del curso)
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-login-overlay" style="z-index: 1200;">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-login-title" style="max-width: 400px;">
+    <div class="modal-header">
+      <h3 id="modal-login-title">Inicia sesión en tu curso</h3>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom: 12px;">Usa el carnet y la contraseña que tu docente te envió por correo. Cada sesión de trabajo queda registrada para el seguimiento del curso; <strong>el texto de tu trabajo y tus capturas no salen de tu dispositivo</strong>.</p>
+      <div class="form-group">
+        <label class="form-label" for="login-carnet">Carnet de identidad</label>
+        <input class="form-input" id="login-carnet" type="text" autocomplete="username" inputmode="text" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="login-password">Contraseña</label>
+        <input class="form-input" id="login-password" type="password" autocomplete="current-password" />
+      </div>
+      <p class="text-sm" id="login-error" style="color: var(--danger); min-height: 1.2em;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="login-skip">Trabajar sin conexión por ahora</button>
+      <button class="btn btn-primary" id="login-submit">Iniciar sesión</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODAL: AUTOR DEL TRABAJO
+══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-author-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-author-title" style="max-width: 420px;">
+    <div class="modal-header">
+      <h3 id="modal-author-title">¿Quién escribe este trabajo?</h3>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom: 10px;">Tu docente usará estos datos para identificar tu entrega y enviarte el reporte por correo.</p>
+      <div class="form-group">
+        <label class="form-label" for="modal-author-name">Nombre y apellido</label>
+        <input class="form-input" id="modal-author-name" type="text" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="modal-author-email">Correo electrónico</label>
+        <input class="form-input" id="modal-author-email" type="email" autocomplete="email" placeholder="correo@universidad.edu" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="modal-author-later">Más tarde</button>
+      <button class="btn btn-primary" id="modal-author-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <!-- ══════════════════════════════════════════════
@@ -1038,8 +1174,14 @@
 <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <!-- JSZip -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- Módulos compartidos: métricas/alertas (mismas reglas que el panel docente) y capturas portables -->
+<script src="config.js?v=3.0"></script>
+<script src="analytics.js?v=3.0"></script>
+<script src="captures.js?v=3.0"></script>
 <!-- Lógica principal -->
-<script src="editor.js?v=1.9"></script>
+<script src="editor.js?v=3.0"></script>
+<!-- Registro del curso en Google Sheets (solo si config.js tiene WEB_APP_URL) -->
+<script src="cloud.js?v=3.0"></script>
 
 <!-- Registro de Service Worker para soporte Offline / PWA -->
 <script>

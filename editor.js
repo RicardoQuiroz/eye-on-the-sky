@@ -17,50 +17,106 @@
    ESTADO GLOBAL DE LA APLICACIÓN
    ================================================================ */
 
+const APP_VERSION = '2.0.0';
+const SCHEMA_VERSION = 2;
+
+function generateProjectId() {
+  if (window.crypto && typeof crypto.randomUUID === 'function') return 'prj_' + crypto.randomUUID();
+  return 'prj_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+/**
+ * Plantilla limpia de un proyecto. Se usa al crear un documento nuevo y como base
+ * al cargar un JSON, para que ningún dato del proyecto anterior (fuentes, huella
+ * biométrica, capturas…) se filtre al proyecto recién abierto.
+ */
+function freshProjectTemplate() {
+  return {
+    metadata: {
+      project_id:    generateProjectId(),
+      title:         '',
+      course:        'Seminario de Grado',
+      student_name:  '',
+      student_email: '',
+      citation_style: '',            // estilo de la bibliografía ('' = el más usado en las fuentes)
+      created_at:    new Date().toISOString(),
+      last_saved:    null,
+      app_version:   APP_VERSION,
+      schema_version: SCHEMA_VERSION,
+    },
+    content:   { delta: null, html: '' },
+    sources:   [],
+    captures:  {},                   // registro de capturas: { nombre: { sha256, mime, size, … } }
+    telemetry: {
+      sessions: [],
+      summary: {
+        total_sessions: 0, total_days_active: 0, total_words_typed: 0,
+        total_chars_pasted: 0, manual_ratio: 0,
+        sources_with_screenshot: 0, sources_cited_in_text: 0,
+      }
+    },
+    biometrics: {
+      baselines: { keyboard: null }, // huella SOLO con teclado físico
+      baseline: null,                // espejo de baselines.keyboard (compatibilidad)
+      session_metrics: null,
+    }
+  };
+}
+
+// Colores de procedencia: definidos en analytics.js (compartido con el dashboard)
+const PROVENANCE_BG = {
+  paste:    EOTS.PROVENANCE.paste.bg,
+  notes:    EOTS.PROVENANCE.notes.bg,
+  quote:    EOTS.PROVENANCE.quote.bg,
+  ai:       EOTS.PROVENANCE.ai.bg,
+  citation: EOTS.PROVENANCE.citation.bg,
+};
+const isProvenanceBackground = EOTS.isProvenanceBackground;
+
+/** Dispositivo actual: id estable por navegador, clase de entrada y etiqueta legible. */
+function getDeviceInfo() {
+  let id = null;
+  try {
+    id = localStorage.getItem('eots-device-id');
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('eots-device-id', id);
+    }
+  } catch (_) { id = 'dev_sin_almacenamiento'; }
+  const ua = navigator.userAgent || '';
+  const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  const fine = window.matchMedia && matchMedia('(any-pointer: fine)').matches;
+  const isTouch = (navigator.maxTouchPoints || 0) > 0 && coarse && !fine;
+  const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iOS'
+    : /Windows/i.test(ua) ? 'Windows' : /Mac OS X/i.test(ua) ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : 'Otro';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox'
+    : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navegador';
+  return { id, class: isTouch ? 'touch' : 'keyboard', label: `${os} · ${browser}${isTouch ? ' (táctil)' : ''}` };
+}
+
+function freshProcessStats() {
+  return {
+    text_keys: 0,        // teclas de texto pulsadas (sin atajos)
+    backspaces: 0,       // pulsaciones de Retroceso / Suprimir
+    chars_typed: 0,      // caracteres insertados tecleando
+    chars_deleted: 0,    // caracteres borrados
+    nonlinear_edits: 0,  // ediciones lejos del punto anterior (volver a revisar texto previo)
+    pauses_2s: 0,        // pausas de 2 a 30 s entre teclas (planificación)
+    active_ms: 0,        // tiempo de tecleo efectivo (huecos < 30 s)
+  };
+}
+
 const App = {
   // Handles del sistema de archivos
   dirHandle:      null,   // FileSystemDirectoryHandle del proyecto
   capturasHandle: null,   // FileSystemDirectoryHandle de subcarpeta capturas/
-  jsonFileHandle: null,   // FileSystemFileHandle del documento.json
+  jsonFileHandle: null,   // FileSystemFileHandle del .json o .zip abierto individualmente (PC)
+  jsonFileName:   'documento.json', // nombre del .json dentro de la carpeta vinculada
+
+  device: null,           // getDeviceInfo()
 
   // Datos del proyecto (lo que se serializa a JSON)
-  project: {
-    metadata: {
-      title:         '',
-      course:        'Seminario de Grado',
-      student_name:  '',
-      created_at:    new Date().toISOString(),
-      last_saved:    null,
-      app_version:   '1.0.0',
-      schema_version: 1,
-    },
-    content: {
-      delta: null,   // Quill Delta (fuente de verdad)
-      html:  '',
-    },
-    sources:   [],  // Array de objetos fuente bibliográfica
-    telemetry: {
-      sessions: [],
-      summary: {
-        total_sessions:       0,
-        total_days_active:    0,
-        total_words_typed:    0,
-        total_chars_pasted:   0,
-        manual_ratio:         0,
-        sources_with_screenshot: 0,
-        sources_cited_in_text:   0,
-      }
-    },
-    biometrics: {
-      baseline: null,
-      session_metrics: {
-        samples: 0,
-        mean_dwell_ms: 0,
-        mean_flight_ms: 0,
-        similarity_score: 100,
-      }
-    }
-  },
+  project: freshProjectTemplate(),
 
   // Estado de la sesión actual
   session: {
@@ -72,12 +128,19 @@ const App = {
     paste_events:      [],
     keystroke_count:   0,
     initial_word_count: 0,
-    active_days_set:   new Set(),
     timer_ref:         null,
     autosave_ref:      null,
     previousWordCount: 0,  // para calcular diff de palabras real
     isPasting:         false, // flag para text-change: ignorar palabras de paste
+    isUndoRedo:        false, // flag: el cambio proviene de Ctrl+Z / Ctrl+Y (no es escritura ni pegado)
+    isSystemInsert:    false, // flag: inserción hecha por la app (cita, índice, bibliografía, captura)
     passedMilestones:  new Set(),
+    process:           freshProcessStats(),
+    lastKeyTime:       0,
+    lastEditIndex:     null,
+    timeline:          [],     // [[seg. desde inicio, caracteres doc, tecleados, pegados]]
+    clipboardToken:    Math.random().toString(36).slice(2, 12), // marca de copias internas
+    resumed:           false,
     biometrics: {
       activeKeyDowns: new Map(),
       lastKeyUpTime:  0,
@@ -85,6 +148,7 @@ const App = {
       spaceDwells:    [],
       backspaceDwells: [],
       notifiedBaseline: false,
+      metrics:        null,    // métricas de ESTA sesión (no se arrastran de otra)
     }
   },
 
@@ -195,13 +259,33 @@ const SoundFx = {
 
 /* ================================================================
    MOTOR DE BIOMETRÍA DE ESCRITURA Y DINÁMICA DE TECLEO
+   - Solo con TECLADO FÍSICO: en pantallas táctiles los tiempos de pulsación del
+     teclado virtual no son comparables (y en Android suelen llegar como
+     "Unidentified"), por lo que se desactiva para no generar falsas alarmas.
+   - Las métricas son POR SESIÓN: no se arrastran de una sesión a otra.
+   - Es un indicador INFORMATIVO, no una prueba de identidad.
    ================================================================ */
 
 const BiometricsEngine = {
-  REQUIRED_SAMPLES: 250,
+  REQUIRED_SAMPLES: EOTS.POLICY.BIO_BASELINE_SAMPLES,
+
+  applies() { return (App.device?.class || 'keyboard') === 'keyboard'; },
+
+  baseline() {
+    const b = App.project.biometrics || {};
+    return b.baselines?.keyboard || b.baseline || null;
+  },
+
+  isUsableKey(e) {
+    if (['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return false;
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key === 'Unidentified' || e.key === 'Process' || e.keyCode === 229) return false; // teclados virtuales / IME
+    if (e.isComposing) return false;
+    return true;
+  },
 
   onKeyDown(e) {
-    if (['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return;
+    if (!this.applies() || !this.isUsableKey(e)) return;
     const now = performance.now();
     const keyId = e.code || e.key;
     if (!App.session.biometrics.activeKeyDowns.has(keyId)) {
@@ -210,7 +294,7 @@ const BiometricsEngine = {
   },
 
   onKeyUp(e) {
-    if (['Shift','Control','Alt','Meta','CapsLock'].includes(e.key)) return;
+    if (!this.applies()) return;
     const now = performance.now();
     const keyId = e.code || e.key;
     const downRec = App.session.biometrics.activeKeyDowns.get(keyId);
@@ -226,170 +310,133 @@ const BiometricsEngine = {
     }
     App.session.biometrics.lastKeyUpTime = now;
 
-    // Solo considerar pausas de ritmo de tipeo normales (10ms a 2500ms)
     const validFlight = (flight !== null && flight >= 10 && flight <= 2500) ? flight : null;
 
-    App.session.biometrics.samples.push({
-      dwell,
-      flight: validFlight,
-      key: e.key,
-      time: Date.now()
-    });
+    App.session.biometrics.samples.push({ dwell, flight: validFlight });
+    // Limitar memoria en sesiones muy largas (las medias siguen siendo representativas)
+    if (App.session.biometrics.samples.length > 5000) App.session.biometrics.samples.shift();
 
-    if (e.key === ' ') App.session.biometrics.spaceDwells.push(dwell);
-    if (e.key === 'Backspace') App.session.biometrics.backspaceDwells.push(dwell);
+    if (downRec.key === ' ') App.session.biometrics.spaceDwells.push(dwell);
+    if (downRec.key === 'Backspace') App.session.biometrics.backspaceDwells.push(dwell);
 
     this.process();
   },
 
   process() {
     const samples = App.session.biometrics.samples;
-    const count = samples.length;
-    const baseline = App.project.biometrics?.baseline;
-
+    const baseline = this.baseline();
     if (!baseline) {
-      // Fase de calibración
-      const dwellValues = samples.map(s => s.dwell);
-      const flightValues = samples.filter(s => s.flight !== null).map(s => s.flight);
-
-      const meanD = dwellValues.length ? (dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length) : 0;
-      const meanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : 0;
-
-      const statusEl = document.getElementById('tele-bio-status');
-      const dwellEl  = document.getElementById('tele-bio-dwell');
-      const flightEl = document.getElementById('tele-bio-flight');
-      const simEl    = document.getElementById('tele-bio-similarity');
-
-      if (statusEl) statusEl.textContent = `Calibrando (${count}/${this.REQUIRED_SAMPLES})`;
-      if (dwellEl)  dwellEl.textContent  = meanD ? `${Math.round(meanD)} ms` : '—';
-      if (flightEl) flightEl.textContent = meanF ? `${Math.round(meanF)} ms` : '—';
-      if (simEl)    simEl.textContent    = 'En curso';
-
-      // ¿Se alcanzó la muestra requerida?
-      if (count >= this.REQUIRED_SAMPLES && !App.session.biometrics.notifiedBaseline) {
-        this.calibrateBaseline(samples, dwellValues, flightValues);
+      if (samples.length >= this.REQUIRED_SAMPLES && !App.session.biometrics.notifiedBaseline) {
+        this.calibrateBaseline(samples);
+      } else {
+        this.updateUI();
       }
     } else {
-      // Huella establecida: verificación continua de identidad
       this.verifySession(samples, baseline);
     }
   },
 
-  calibrateBaseline(samples, dwellValues, flightValues) {
+  stats(samples) {
+    const d = samples.map(s => s.dwell);
+    const f = samples.filter(s => s.flight !== null).map(s => s.flight);
+    const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+    const std = (a, m) => a.length ? Math.sqrt(a.reduce((x, v) => x + (v - m) ** 2, 0) / a.length) : 0;
+    const mD = mean(d), mF = f.length ? mean(f) : 150;
+    return { meanD: mD, stdD: std(d, mD), meanF: mF, stdF: f.length ? std(f, mF) : 20 };
+  },
+
+  calibrateBaseline(samples) {
     App.session.biometrics.notifiedBaseline = true;
+    const st = this.stats(samples);
+    const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : st.meanD;
+    const r1 = v => Math.round(v * 10) / 10;
 
-    const meanD = dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length;
-    const varianceD = dwellValues.reduce((sum, v) => sum + Math.pow(v - meanD, 2), 0) / dwellValues.length;
-    const stdD = Math.sqrt(varianceD);
-
-    const meanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : 150;
-    const varianceF = flightValues.length ? (flightValues.reduce((sum, v) => sum + Math.pow(v - meanF, 2), 0) / flightValues.length) : 400;
-    const stdF = Math.sqrt(varianceF);
-
-    const spaceMean = App.session.biometrics.spaceDwells.length
-      ? App.session.biometrics.spaceDwells.reduce((a,b)=>a+b,0) / App.session.biometrics.spaceDwells.length
-      : meanD;
-
-    const backspaceMean = App.session.biometrics.backspaceDwells.length
-      ? App.session.biometrics.backspaceDwells.reduce((a,b)=>a+b,0) / App.session.biometrics.backspaceDwells.length
-      : meanD;
-
-    App.project.biometrics.baseline = {
+    const baseline = {
       established_at:     new Date().toISOString(),
+      device_class:       'keyboard',
+      device_label:       App.device?.label || '',
       sample_size:        samples.length,
-      mean_dwell_ms:      Math.round(meanD * 10) / 10,
-      std_dwell_ms:       Math.round(stdD * 10) / 10,
-      mean_flight_ms:     Math.round(meanF * 10) / 10,
-      std_flight_ms:      Math.round(stdF * 10) / 10,
-      space_dwell_ms:     Math.round(spaceMean * 10) / 10,
-      backspace_dwell_ms: Math.round(backspaceMean * 10) / 10,
+      mean_dwell_ms:      r1(st.meanD),
+      std_dwell_ms:       r1(st.stdD),
+      mean_flight_ms:     r1(st.meanF),
+      std_flight_ms:      r1(st.stdF),
+      space_dwell_ms:     r1(mean(App.session.biometrics.spaceDwells)),
+      backspace_dwell_ms: r1(mean(App.session.biometrics.backspaceDwells)),
+    };
+    if (!App.project.biometrics) App.project.biometrics = {};
+    if (!App.project.biometrics.baselines) App.project.biometrics.baselines = {};
+    App.project.biometrics.baselines.keyboard = baseline;
+    App.project.biometrics.baseline = baseline;
+
+    App.session.biometrics.metrics = {
+      samples: samples.length, mean_dwell_ms: r1(st.meanD), mean_flight_ms: r1(st.meanF), similarity_score: 100,
     };
 
-    App.project.biometrics.session_metrics = {
-      samples: samples.length,
-      mean_dwell_ms: Math.round(meanD * 10) / 10,
-      mean_flight_ms: Math.round(meanF * 10) / 10,
-      similarity_score: 100
-    };
-
-    // Actualizar campos del modal
     const mDwell = document.getElementById('modal-bio-dwell');
     const mFlight = document.getElementById('modal-bio-flight');
     const mSamples = document.getElementById('modal-bio-samples');
-    if (mDwell)   mDwell.textContent   = `${Math.round(meanD)} ms`;
-    if (mFlight)  mFlight.textContent  = `${Math.round(meanF)} ms`;
+    if (mDwell)   mDwell.textContent   = `${Math.round(st.meanD)} ms`;
+    if (mFlight)  mFlight.textContent  = `${Math.round(st.meanF)} ms`;
     if (mSamples) mSamples.textContent = `${samples.length} pulsaciones`;
-
-    // Abrir modal notificando al usuario
     openModal('modal-biometrics-overlay');
-
-    // Reproducir sonido de hito
     SoundFx.play('milestone_words');
-
     this.updateUI();
-
-    // Guardar para asentar la huella en el JSON inmediatamente
     saveProject();
   },
 
   verifySession(samples, baseline) {
-    if (samples.length < 25) return;
-
-    const dwellValues = samples.map(s => s.dwell);
-    const flightValues = samples.filter(s => s.flight !== null).map(s => s.flight);
-
-    const sessMeanD = dwellValues.reduce((a, b) => a + b, 0) / dwellValues.length;
-    const sessMeanF = flightValues.length ? (flightValues.reduce((a, b) => a + b, 0) / flightValues.length) : baseline.mean_flight_ms;
-
-    // Distancia normalizada
-    const zD = Math.abs(sessMeanD - baseline.mean_dwell_ms) / Math.max(baseline.std_dwell_ms || 20, 10);
-    const zF = Math.abs(sessMeanF - baseline.mean_flight_ms) / Math.max(baseline.std_flight_ms || 35, 15);
+    if (samples.length < EOTS.POLICY.BIO_MIN_SAMPLES) { this.updateUI(); return; }
+    const st = this.stats(samples);
+    const zD = Math.abs(st.meanD - baseline.mean_dwell_ms) / Math.max(baseline.std_dwell_ms || 20, 10);
+    const zF = Math.abs(st.meanF - baseline.mean_flight_ms) / Math.max(baseline.std_flight_ms || 35, 15);
     const dist = 0.5 * zD + 0.5 * zF;
-
     const similarity = Math.max(0, Math.min(100, Math.round(100 - (dist * 20))));
-
-    App.project.biometrics.session_metrics = {
+    App.session.biometrics.metrics = {
       samples: samples.length,
-      mean_dwell_ms: Math.round(sessMeanD * 10) / 10,
-      mean_flight_ms: Math.round(sessMeanF * 10) / 10,
-      similarity_score: similarity
+      mean_dwell_ms: Math.round(st.meanD * 10) / 10,
+      mean_flight_ms: Math.round(st.meanF * 10) / 10,
+      similarity_score: similarity,
     };
-
     this.updateUI();
   },
 
   updateUI() {
-    const baseline = App.project.biometrics?.baseline;
     const statusEl = document.getElementById('tele-bio-status');
     const dwellEl  = document.getElementById('tele-bio-dwell');
     const flightEl = document.getElementById('tele-bio-flight');
     const simEl    = document.getElementById('tele-bio-similarity');
+    const setColor = (el, c) => { if (el) el.style.color = c; };
 
+    if (!this.applies()) {
+      if (statusEl) { statusEl.textContent = 'No aplica (pantalla táctil)'; setColor(statusEl, 'var(--text-muted)'); }
+      if (dwellEl) dwellEl.textContent = '—';
+      if (flightEl) flightEl.textContent = '—';
+      if (simEl) { simEl.textContent = '—'; setColor(simEl, 'var(--text-muted)'); }
+      return;
+    }
+    const baseline = this.baseline();
+    const sm = App.session.biometrics.metrics;
     if (baseline) {
-      if (statusEl) {
-        statusEl.textContent = '✓ Calibrada';
-        statusEl.style.color = 'var(--success)';
-      }
-      const sm = App.project.biometrics.session_metrics;
-      if (dwellEl)  dwellEl.textContent  = `${sm?.mean_dwell_ms || baseline.mean_dwell_ms} ms`;
-      if (flightEl) flightEl.textContent = `${sm?.mean_flight_ms || baseline.mean_flight_ms} ms`;
+      if (statusEl) { statusEl.textContent = '✓ Calibrada'; setColor(statusEl, 'var(--success)'); }
+      if (dwellEl)  dwellEl.textContent  = `${sm?.mean_dwell_ms ?? baseline.mean_dwell_ms} ms`;
+      if (flightEl) flightEl.textContent = `${sm?.mean_flight_ms ?? baseline.mean_flight_ms} ms`;
       if (simEl) {
-        const score = sm?.similarity_score ?? 100;
-        simEl.textContent = `${score}%`;
-        if (score >= 75) {
-          simEl.style.color = 'var(--success)';
-        } else if (score >= 60) {
-          simEl.style.color = 'var(--warning)';
-        } else {
-          simEl.style.color = 'var(--danger)';
+        if (!sm) { simEl.textContent = 'Midiendo…'; setColor(simEl, 'var(--text-muted)'); }
+        else {
+          const lvl = EOTS.bioLevel(sm.similarity_score);
+          simEl.textContent = `${sm.similarity_score}%`;
+          setColor(simEl, lvl === 'ok' ? 'var(--success)' : lvl === 'warning' ? 'var(--warning)' : 'var(--danger)');
         }
       }
     } else {
+      const st = this.stats(App.session.biometrics.samples);
       if (statusEl) {
-        const cnt = App.session.biometrics.samples.length;
-        statusEl.textContent = `Calibrando (${cnt}/${this.REQUIRED_SAMPLES})`;
-        statusEl.style.color = 'var(--accent)';
+        statusEl.textContent = `Calibrando (${App.session.biometrics.samples.length}/${this.REQUIRED_SAMPLES})`;
+        setColor(statusEl, 'var(--accent)');
       }
+      if (dwellEl)  dwellEl.textContent  = App.session.biometrics.samples.length ? `${Math.round(st.meanD)} ms` : '—';
+      if (flightEl) flightEl.textContent = App.session.biometrics.samples.length ? `${Math.round(st.meanF)} ms` : '—';
+      if (simEl)    { simEl.textContent = 'En curso'; setColor(simEl, 'var(--text-muted)'); }
     }
   }
 };
@@ -399,7 +446,9 @@ const BiometricsEngine = {
    ================================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
+  App.device = getDeviceInfo();
   SoundFx.init();
+  initUndoRedoGuard();
   initQuill();
   initEventListeners();
   initSessionTimer();
@@ -419,7 +468,10 @@ function checkAndRestoreActiveProject() {
         const name = localStorage.getItem('eots_active_project_name') || 'documento.json';
         // Cargamos el proyecto restaurado tras un breve retardo para que la interfaz se asiente
         setTimeout(() => {
-          loadProjectFromParsedJSON(parsed, name).catch(() => {});
+          // Solo si el usuario no abrió otro proyecto mientras tanto
+          if (!App.ui.projectLoaded) {
+            loadProjectFromParsedJSON(parsed, name, { silentRestore: true }).catch(() => {});
+          }
         }, 350);
       }
     } catch (e) {
@@ -467,6 +519,36 @@ function initQuill() {
       AcademicTableBlot.tagName = 'div';
       AcademicTableBlot.className = 'academic-table-container';
       Quill.register(AcademicTableBlot, true);
+
+      /**
+       * Captura de evidencia incrustada como IMAGEN real. El documento solo guarda el
+       * nombre estable de la captura; la imagen se resuelve desde el almacén portable
+       * (IndexedDB / carpeta capturas/), así el enlace sobrevive al cambio de dispositivo.
+       */
+      class CaptureBlot extends BlockEmbed {
+        static create(value) {
+          const node = super.create();
+          const v = (value && typeof value === 'object') ? value : { filename: String(value || '') };
+          node.setAttribute('contenteditable', 'false');
+          node.dataset.filename = v.filename || '';
+          node.dataset.caption = v.caption || '';
+          const img = document.createElement('img');
+          img.alt = v.caption || v.filename || 'Captura';
+          const cap = document.createElement('figcaption');
+          cap.textContent = v.caption ? `📸 ${v.caption}` : `📸 ${v.filename || ''}`;
+          node.appendChild(img);
+          node.appendChild(cap);
+          renderCaptureNode(node);
+          return node;
+        }
+        static value(node) {
+          return { filename: node.dataset.filename || '', caption: node.dataset.caption || '' };
+        }
+      }
+      CaptureBlot.blotName = 'eots-capture';
+      CaptureBlot.tagName = 'figure';
+      CaptureBlot.className = 'eots-capture';
+      Quill.register(CaptureBlot, true);
     }
   } catch (err) {
     console.debug('Aviso al registrar formatos personalizados en Quill:', err);
@@ -480,6 +562,11 @@ function initQuill() {
     placeholder: 'Comienza a escribir tu documento de investigación aquí…',
     scrollingContainer: '#editor-area',
   });
+
+  // "Limpiar formato" (Tx) quita negritas, cursivas, títulos, etc., pero CONSERVA los
+  // colores de procedencia: son metadatos de auditoría, no un estilo del estudiante.
+  const toolbarModule = App.quill.getModule('toolbar');
+  if (toolbarModule) toolbarModule.addHandler('clean', cleanFormatPreservingProvenance);
 
   // Evitar saltos de navegación (scroll al inicio del documento) al aplicar estilos o reenfocar el editor
   const editorArea = document.getElementById('editor-area');
@@ -531,101 +618,121 @@ function initQuill() {
     quillToolbar.addEventListener('change', restoreScroll, { capture: true });
   }
 
-  // Telemetría: detectar texto tecleado vs pegado
+  // Telemetría: detectar texto tecleado vs pegado y medir el proceso de escritura
   App.quill.on('text-change', (delta, oldDelta, source) => {
     if (source !== 'user') return;
     App.ui.isDirty = true;
     updateSaveStatus('unsaved');
 
-    const text       = App.quill.getText();
-    const currentWC  = countWords(text);
+    const currentWC  = docWordCount();
     const wordDiff   = Math.max(0, currentWC - App.session.previousWordCount);
 
-    if (wordDiff > 0) {
-      if (App.session.isPasting) {
-        // Ignorar palabras insertadas durante un evento de pegado capturado
-      } else if (wordDiff >= 10) {
-        // Inserción masiva súbita no capturada por evento DOM paste (ej: móviles Android/iOS o drag & drop)
-        const isInitial = isProjectInitialPaste();
-        const approxChars = wordDiff * 5;
-        const pasteRecord = {
-          timestamp:    new Date().toISOString(),
-          chars_pasted: approxChars,
-          approx_words: wordDiff,
-          is_initial:   isInitial,
-        };
-        App.session.paste_events.push(pasteRecord);
-        if (isInitial) {
-          App.project.has_initial_paste = true;
-          showToast('📋 Pegado inicial detectado y registrado como material base exento (0 penalización).', 'info');
-        } else {
-          App.session.chars_pasted += approxChars;
-          SoundFx.play('paste_alert');
-        }
-      } else {
-        // Escritura manual genuina (< 10 palabras en un solo micro-cambio)
-        App.session.words_typed += wordDiff;
+    const refreshViews = () => {
+      App.session.previousWordCount = currentWC;
+      updateWordCount(currentWC);
+      scheduleTelemetryUI();
+      scheduleUpdateTOC();
+      updatePageMetrics();
+      updateCursorPosition();
+      adjustAllTablesWrapping();
+    };
+
+    // Deshacer/Rehacer (Ctrl+Z / Ctrl+Y) e inserciones propias de la app (citas, índice,
+    // bibliografía, capturas) NO son escritura manual ni pegado: solo se resincroniza el conteo.
+    if (App.session.isUndoRedo || App.session.isSystemInsert) {
+      refreshViews();
+      return;
+    }
+
+    // Analizar el cambio: caracteres insertados/borrados y dónde ocurrió
+    let inserted = 0, deleted = 0, firstIdx = null, idx = 0;
+    const insertedRanges = [];
+    let insertedText = '';
+    for (const op of delta.ops || []) {
+      if (typeof op.retain === 'number') { idx += op.retain; continue; }
+      if (typeof op.insert === 'string') {
+        if (firstIdx === null) firstIdx = idx;
+        inserted += op.insert.length;
+        insertedRanges.push([idx, op.insert.length]);
+        insertedText += op.insert;
+        idx += op.insert.length;
+      } else if (op.insert !== undefined) {
+        if (firstIdx === null) firstIdx = idx;
+        idx += 1;
+      } else if (typeof op.delete === 'number') {
+        if (firstIdx === null) firstIdx = idx;
+        deleted += op.delete;
       }
     }
 
-    // Hitos de palabras para gamificación (100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000)
+    if (App.session.isPasting) {
+      // El pegado ya fue registrado por handlePasteEvent (externo) o es una
+      // reubicación interna (cortar/pegar dentro del propio documento).
+    } else if (wordDiff >= 10) {
+      // Inserción masiva sin evento "paste" (menú contextual de móviles, arrastrar y soltar,
+      // pegado dentro de una tabla): se trata exactamente igual que un pegado.
+      registerExternalInsertion({
+        text: insertedText || '',
+        words: wordDiff,
+        ranges: insertedRanges,
+        via: 'insercion',
+      });
+    } else {
+      // Escritura manual genuina
+      App.session.words_typed += wordDiff;
+      const pr = App.session.process;
+      pr.chars_typed += inserted;
+      pr.chars_deleted += deleted;
+      if (firstIdx !== null) {
+        const docLen = App.quill.getLength();
+        const last = App.session.lastEditIndex;
+        if (last !== null && Math.abs(firstIdx - last) > 40 && firstIdx < docLen - 40) {
+          pr.nonlinear_edits++; // volvió a una parte anterior del texto para revisarla
+        }
+        App.session.lastEditIndex = firstIdx + inserted;
+      }
+
+      // El texto tecleado a mano nunca debe heredar el color de procedencia del texto
+      // vecino (pegado, notas, cita…). Quill hace que lo que se escribe justo después de
+      // un tramo con formato herede ese formato; aquí se limpia.
+      insertedRanges.forEach(([i, len]) => {
+        const f = App.quill.getFormat(i, Math.max(1, len));
+        if (len <= 3 && f && isProvenanceBackground(f.background)) {
+          App.quill.formatText(i, len, 'background', false, 'silent');
+        }
+      });
+    }
+
+    // Hitos de palabras para gamificación
     const milestones = [100, 250, 500, 750, 1000, 1500, 2000, 2500, 3000, 5000];
     for (const m of milestones) {
       if (currentWC >= m && !App.session.passedMilestones.has(m)) {
         App.session.passedMilestones.add(m);
         if (!App.session.isPasting && wordDiff < 10) {
           SoundFx.play('milestone_words');
-          showToast(`🎯 ¡Hito alcanzado: ${m} palabras escritas!`, 'success');
+          showToast(`🎯 ¡Hito alcanzado: ${m} palabras en tu documento!`, 'success');
         }
       }
     }
 
-    App.session.previousWordCount = currentWC;
-    updateWordCount(currentWC);
-    updateTelemetryUI();
-
-    // Actualizar TOC, cálculo de páginas, posición de cursor y tablas
-    scheduleUpdateTOC();
-    updatePageMetrics();
-    updateCursorPosition();
-    adjustAllTablesWrapping();
-
-    // Bug fix: limpiar formato 'background' activo si el usuario está escribiendo
-    // manualmente (no pegando), para que el color de procedencia no se propague
-    if (!App.session.isPasting && source === 'user') {
-      // Solo limpiar si el delta insertado es texto puro (una letra a la vez)
-      const ops = delta.ops || [];
-      const hasInsert = ops.some(op => typeof op.insert === 'string' && op.insert.length <= 3);
-      if (hasInsert) {
-        // Verificar si el cursor tiene formato background activo y limpiarlo
-        const range = App.quill.getSelection();
-        if (range) {
-          const format = App.quill.getFormat(range.index > 0 ? range.index - 1 : 0, 1);
-          if (format.background && format.background !== false) {
-            // No limpiar citas (morado) ni pegado inicial (azul), solo texto ya escrito
-            // que heredó el color rojo del paste anterior
-            const isRedish = format.background && format.background.includes('229, 57, 53');
-            if (isRedish) {
-              App.quill.formatText(range.index - 1, 1, 'background', false, 'silent');
-            }
-          }
-        }
-      }
-    }
+    refreshViews();
   });
 
   // Seguimiento de posición de cursor en tiempo real (Línea X de Pág. Y)
-  App.quill.on('selection-change', (range, oldRange, source) => {
+  App.quill.on('selection-change', () => {
     updateCursorPosition();
   });
 
   // Activar corrector ortográfico nativo del navegador en español y eventos biométricos
   const editorEl = document.querySelector('#quill-editor .ql-editor');
+  const editorWrap = document.getElementById('quill-editor');
   if (editorEl) {
     editorEl.setAttribute('spellcheck', 'true');
     editorEl.setAttribute('lang', 'es');
     editorEl.setAttribute('autocorrect', 'on');
     editorEl.addEventListener('paste', handlePasteEvent);
+    editorEl.addEventListener('copy', (e) => handleCopyCut(e, false));
+    editorEl.addEventListener('cut', (e) => handleCopyCut(e, true));
     editorEl.addEventListener('keydown', handleKeystrokeEvent);
     editorEl.addEventListener('keyup', (e) => {
       handleKeyUpEvent(e);
@@ -635,17 +742,46 @@ function initQuill() {
       scheduleUpdateTOC();
       updatePageMetrics();
       updateCursorPosition();
-      const table = e.target.closest('.academic-table');
+      const table = e.target.closest && e.target.closest('.academic-table');
       if (table) {
         adjustTableWrapping(table);
+        if (e.inputType && e.inputType.startsWith('insert') && e.inputType !== 'insertFromPaste' && e.data) {
+          App.session.process.chars_typed += e.data.length;
+        }
+        if (e.inputType && e.inputType.startsWith('delete')) App.session.process.chars_deleted += 1;
         App.ui.isDirty = true;
         updateSaveStatus('unsaved');
       }
     });
     editorEl.addEventListener('click', (e) => {
       handleTableActionClick(e);
+      handleCaptureClick(e);
       updateCursorPosition();
     });
+  }
+
+  // Celdas de tabla: el editor (Quill) no debe interceptar las teclas ni el pegado que
+  // ocurren DENTRO de una celda (antes Retroceso podía borrar la tabla completa y el
+  // pegado se insertaba fuera de la tabla). Se usa la fase de captura del contenedor.
+  if (editorWrap) {
+    const inCell = (t) => t && t.closest && t.closest('.academic-table td, .academic-table th');
+    editorWrap.addEventListener('keydown', (e) => {
+      if (!inCell(e.target)) return;
+      handleKeystrokeEvent(e);   // telemetría y biometría igualmente
+      e.stopPropagation();       // Quill no procesa la tecla; el navegador edita la celda
+    }, true);
+    editorWrap.addEventListener('paste', (e) => {
+      if (!inCell(e.target)) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const text = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+      if (!text) return;
+      App.session.isPasting = true;
+      document.execCommand('insertText', false, text);
+      setTimeout(() => { App.session.isPasting = false; }, 150);
+      // El texto queda dentro de la tabla: se registra el pegado (no se puede colorear la celda)
+      registerExternalInsertion({ text, words: countWords(text), ranges: [], via: 'tabla' });
+    }, true);
   }
 }
 
@@ -653,112 +789,300 @@ function initQuill() {
    TELEMETRÍA
    ================================================================ */
 
-function isProjectInitialPaste() {
-  // 1. Si el proyecto ya tiene registrado un pegado inicial
-  if (App.project.has_initial_paste) return false;
-
-  // 2. Si alguna sesión previa en el historial ya contiene un pegado inicial
-  const sessions = App.project.telemetry?.sessions || [];
-  const hadInitial = sessions.some(s => (s.paste_events || []).some(p => p.is_initial));
-  if (hadInitial) {
-    App.project.has_initial_paste = true;
-    return false;
+/** Recorre un Delta de Quill y llama a cb(index, length, attributes) por cada texto insertado. */
+function forEachInsertedRange(delta, cb) {
+  let idx = 0;
+  for (const op of (delta && delta.ops) || []) {
+    if (typeof op.retain === 'number') {
+      idx += op.retain;
+    } else if (op.insert !== undefined) {
+      const len = typeof op.insert === 'string' ? op.insert.length : 1;
+      if (typeof op.insert === 'string') cb(idx, len, op.attributes || null);
+      idx += len;
+    }
+    // op.delete no avanza el índice en el documento resultante
   }
+}
 
-  // 3. Si en la sesión activa ya se registró un pegado inicial
-  if ((App.session.paste_events || []).some(p => p.is_initial)) {
-    return false;
-  }
+/** Ejecuta fn() marcando el cambio como inserción del sistema (no cuenta como tecleo ni pegado). */
+function runAsSystemInsert(fn) {
+  App.session.isSystemInsert = true;
+  try { return fn(); }
+  finally { App.session.isSystemInsert = false; }
+}
 
-  // 4. Si el proyecto ya tiene más de 1 sesión consolidada o >100 palabras previas escritas
-  const totalPrevTyped = sessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
-  if (sessions.length > 1 || totalPrevTyped > 100) {
-    return false;
-  }
+/**
+ * Marca Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z (y "Deshacer" del menú del navegador) para que
+ * text-change no confunda el texto restaurado con un pegado. Se usa la fase de captura
+ * en document porque el atajo de Quill se ejecuta en el keydown del propio editor.
+ */
+function initUndoRedoGuard() {
+  const mark = () => {
+    App.session.isUndoRedo = true;
+    setTimeout(() => { App.session.isUndoRedo = false; }, 0);
+  };
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = (e.key || '').toLowerCase();
+    if (k === 'z' || k === 'y') mark();
+  }, true);
+  document.addEventListener('beforeinput', (e) => {
+    if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') mark();
+  }, true);
+}
 
-  // 5. Si el documento actual ya tiene más de 120 palabras antes del pegado
-  const currentWC = App.quill ? countWords(App.quill.getText()) : 0;
-  if (currentWC > 120) {
-    return false;
-  }
+/* ----------------------------------------------------------------
+   COPIAR / CORTAR / PEGAR
+   ---------------------------------------------------------------- */
 
-  // Es el primer pegado masivo del documento (completamente exento)
-  return true;
+/** Marca persistente de este dispositivo para reconocer copias hechas DENTRO del editor. */
+function clipboardToken() {
+  try {
+    let t = localStorage.getItem('eots-clip-token');
+    if (!t) { t = 'eotsclip_' + Math.random().toString(36).slice(2, 12); localStorage.setItem('eots-clip-token', t); }
+    return t;
+  } catch (_) { return App.session.clipboardToken; }
+}
+
+/**
+ * Copiar/cortar dentro del documento: se etiqueta el portapapeles para que, al pegarlo
+ * de nuevo aquí, se reconozca como REUBICACIÓN de texto propio (conserva su color de
+ * procedencia original y no cuenta como pegado externo).
+ */
+function handleCopyCut(e, isCut) {
+  if (!App.quill || !e.clipboardData) return;
+  const sel = App.quill.getSelection();
+  if (!sel || sel.length === 0) return;
+  const domSel = window.getSelection();
+  if (!domSel || domSel.rangeCount === 0) return;
+  const holder = document.createElement('div');
+  holder.appendChild(domSel.getRangeAt(0).cloneContents());
+  holder.querySelectorAll('.academic-table-controls').forEach(n => n.remove());
+  const token = clipboardToken();
+  const text = App.quill.getText(sel.index, sel.length);
+  try {
+    e.clipboardData.setData('text/plain', text);
+    e.clipboardData.setData('text/html', `<span data-eots-clip="${token}"></span>${holder.innerHTML}`);
+    e.clipboardData.setData('application/x-eots-clip', token);
+    e.preventDefault();
+    if (isCut) App.quill.deleteText(sel.index, sel.length, 'user');
+  } catch (_) { /* si el navegador no permite escribir el portapapeles, se usa el comportamiento normal */ }
+}
+
+function isInternalClipboard(cd) {
+  if (!cd) return false;
+  const token = clipboardToken();
+  try {
+    if ((cd.types || []).includes('application/x-eots-clip') && cd.getData('application/x-eots-clip') === token) return true;
+  } catch (_) {}
+  const html = cd.getData('text/html') || '';
+  return html.includes(`data-eots-clip="${token}"`);
 }
 
 function handlePasteEvent(e) {
-  const clipText = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-  const chars = clipText.length;
-  if (chars < 10) return; // ignora pegados triviales
+  const cd = e.clipboardData;
+  const clipText = cd ? cd.getData('text/plain') : '';
 
-  // Determinar si es el primer pegado masivo del documento
-  const isInitialPaste = isProjectInitialPaste();
+  // Reubicación de texto propio (cortar/pegar dentro del documento): no es pegado externo
+  if (isInternalClipboard(cd)) {
+    App.session.isPasting = true;
+    setTimeout(() => { App.session.isPasting = false; }, 150);
+    return;
+  }
+  if (!clipText || clipText.trim().length === 0) return;
+
   const range = App.quill ? App.quill.getSelection() : null;
   const pasteIndex = (range && typeof range.index === 'number') ? range.index : 0;
+  const replacedLen = (range && typeof range.length === 'number') ? range.length : 0;
+  const lenBefore = App.quill ? App.quill.getLength() : 0;
 
-  // Activar flag para que text-change no cuente estas palabras como manuales
+  // Que text-change no cuente estas palabras como tecleadas
   App.session.isPasting = true;
   setTimeout(() => {
     App.session.isPasting = false;
-    // Aplicar color de procedencia en Quill según el tipo de pegado
-    if (App.quill && chars > 0) {
-      const bgColor = isInitialPaste ? 'rgba(74, 108, 247, 0.16)' : 'rgba(229, 57, 53, 0.18)';
-      // Calcular cuántos caracteres se insertaron realmente dentro de límites válidos
-      const currentLen = App.quill.getLength();
-      const safeIndex = Math.min(Math.max(0, pasteIndex), currentLen - 1);
-      const insertedChars = Math.min(chars, Math.max(0, currentLen - safeIndex - 1));
-      if (insertedChars > 0) {
-        App.quill.formatText(safeIndex, insertedChars, 'background', bgColor, 'silent');
-      }
-      // CRÍTICO: Limpiar el formato activo del cursor para que el texto
-      // que se escriba a continuación NO herede el color del paste
-      App.quill.removeFormat(App.quill.getLength() - 1, 1);
-      // Forzar que el cursor no tenga formato background activo
-      const sel = App.quill.getSelection();
-      if (sel) {
-        App.quill.formatText(sel.index, 0, 'background', false, 'silent');
-      }
-    }
+    if (!App.quill) return;
+    // Longitud realmente insertada = crecimiento del documento + lo que reemplazó la selección.
+    // (No se usa clipText.length: en Windows el portapapeles trae \r\n y Quill lo normaliza a \n.)
+    const currentLen = App.quill.getLength();
+    const safeIndex = Math.min(Math.max(0, pasteIndex), currentLen - 1);
+    const insertedChars = Math.max(0, Math.min(currentLen - lenBefore + replacedLen, currentLen - safeIndex - 1));
+    registerExternalInsertion({
+      text: clipText,
+      words: countWords(clipText),
+      ranges: insertedChars > 0 ? [[safeIndex, insertedChars]] : [],
+      via: 'pegado',
+    });
   }, 120);
-
-  const approxWords = Math.round(chars / 5);
-
-  const pasteRecord = {
-    timestamp:    new Date().toISOString(),
-    chars_pasted: chars,
-    approx_words: approxWords,
-    is_initial:   isInitialPaste,
-  };
-
-  App.session.paste_events.push(pasteRecord);
-
-  if (isInitialPaste) {
-    App.project.has_initial_paste = true;
-    // CRÍTICO: No sumar a App.session.chars_pasted para no distorsionar estadísticas
-    showToast('📋 Pegado inicial de material base registrado (exento de penalización en estadísticas).', 'info');
-  } else {
-    // Solo penalizar pastes que no son el inicial
-    App.session.chars_pasted += chars;
-    SoundFx.play('paste_alert');
-  }
-
-  updateTelemetryUI();
 }
 
+/**
+ * Registra un texto que NO se tecleó (pegado, arrastre, menú contextual del móvil…).
+ * Se marca en rojo como "pegado sin declarar" y, si es grande, se pide al estudiante
+ * que lo declare (notas propias, cita textual, IA). Lo declarado cambia de color y no
+ * se penaliza, pero el docente lo ve.
+ */
+function registerExternalInsertion({ text, words, ranges, via }) {
+  const clean = (text || '').replace(/\r\n/g, '\n');
+  const chars = clean.replace(/\s+/g, '').length;
+  if (chars === 0) return;
+  const ev = {
+    id:           'pst_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    timestamp:    new Date().toISOString(),
+    chars_pasted: chars,
+    approx_words: words || countWords(clean),
+    kind:         'paste',
+    declared:     false,
+    via,
+    excerpt:      clean.trim().slice(0, 160),
+    source_id:    null,
+    is_initial:   false,
+  };
+  App.session.paste_events.push(ev);
+  (ranges || []).forEach(([i, len]) => App.quill.formatText(i, len, 'background', PROVENANCE_BG.paste, 'silent'));
+
+  if (ev.approx_words >= EOTS.POLICY.PASTE_DECLARE_MIN_WORDS) {
+    queuePasteDeclaration(ev, ranges || []);
+  } else {
+    SoundFx.play('paste_alert');
+  }
+  App.ui.isDirty = true;
+  scheduleTelemetryUI();
+}
+
+/* ---- Declaración de pegados ---- */
+const PasteDeclare = { queue: [], current: null };
+
+function queuePasteDeclaration(ev, ranges) {
+  PasteDeclare.queue.push({ ev, ranges });
+  if (!PasteDeclare.current) showNextPasteDeclaration();
+}
+
+function showNextPasteDeclaration() {
+  PasteDeclare.current = PasteDeclare.queue.shift() || null;
+  if (!PasteDeclare.current) return;
+  const { ev } = PasteDeclare.current;
+  const ex = document.getElementById('paste-declare-excerpt');
+  const wd = document.getElementById('paste-declare-words');
+  if (ex) ex.textContent = ev.excerpt + (ev.excerpt.length >= 160 ? '…' : '');
+  if (wd) wd.textContent = `${ev.approx_words} palabras`;
+  const sel = document.getElementById('paste-quote-source');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Elige la fuente citada —</option>' +
+      (App.project.sources || []).map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml((s.authors?.[0] || 'Anón.').split(',')[0])} (${escapeHtml(String(s.year || 's. f.'))}) — ${escapeHtml((s.title || '').slice(0, 60))}</option>`).join('');
+  }
+  // Sugerencia: si el documento está casi vacío, lo más probable son notas propias
+  const docWords = docWordCount();
+  const suggested = docWords - ev.approx_words < 60 ? 'notes' : '';
+  document.querySelectorAll('input[name="paste-kind"]').forEach(r => { r.checked = (r.value === suggested); });
+  updatePasteDeclareForm();
+  openModal('modal-paste-overlay');
+}
+
+function updatePasteDeclareForm() {
+  const kind = document.querySelector('input[name="paste-kind"]:checked')?.value || '';
+  const row = document.getElementById('paste-quote-row');
+  if (row) row.style.display = kind === 'quote' ? 'block' : 'none';
+}
+
+function resolvePasteDeclaration(declare) {
+  const item = PasteDeclare.current;
+  closeModal('modal-paste-overlay');
+  if (!item) return;
+  const { ev, ranges } = item;
+  let kind = declare ? (document.querySelector('input[name="paste-kind"]:checked')?.value || '') : '';
+  if (kind === 'quote') {
+    const srcId = document.getElementById('paste-quote-source')?.value || '';
+    if (!srcId) {
+      showToast('Para declarar una cita textual elige la fuente de la que proviene.', 'warning');
+      PasteDeclare.queue.unshift(item);
+      PasteDeclare.current = null;
+      setTimeout(showNextPasteDeclaration, 50);
+      return;
+    }
+    ev.source_id = srcId;
+    const src = App.project.sources.find(s => s.id === srcId);
+    if (src) { src.quoted_in_text = true; src.cited_in_text = true; }
+  }
+  if (['notes', 'quote', 'ai'].includes(kind)) {
+    ev.kind = kind;
+    ev.declared = true;
+    ev.declared_at = new Date().toISOString();
+    ranges.forEach(([i, len]) => {
+      if (i + len <= App.quill.getLength()) App.quill.formatText(i, len, 'background', PROVENANCE_BG[kind], 'silent');
+    });
+    showToast(`Pegado declarado como: ${EOTS.PROVENANCE[kind].label}.`, 'info');
+  } else {
+    ev.kind = 'paste';
+    ev.declared = false;
+    SoundFx.play('paste_alert');
+    showToast('Pegado registrado SIN declarar (se reporta al docente).', 'warning');
+  }
+  App.ui.isDirty = true;
+  renderSourcesList();
+  scheduleTelemetryUI();
+  PasteDeclare.current = null;
+  if (PasteDeclare.queue.length) setTimeout(showNextPasteDeclaration, 200);
+}
+
+/* ---- Limpiar formato conservando la procedencia ---- */
+function cleanFormatPreservingProvenance(range) {
+  const quill = App.quill;
+  range = range || quill.getSelection();
+  if (!range) return;
+  if (range.length === 0) {
+    // Cursor sin selección: quitar formatos de escritura activos, excepto el fondo
+    const formats = quill.getFormat();
+    Object.keys(formats).forEach(name => {
+      if (name === 'background') return;
+      const Parchment = Quill.import('parchment');
+      if (Parchment.query(name, Parchment.Scope.INLINE) != null) quill.format(name, false, 'user');
+    });
+    return;
+  }
+  // Guardar los tramos con color de procedencia, limpiar y volver a aplicarlos
+  const keep = [];
+  let off = 0;
+  (quill.getContents(range.index, range.length).ops || []).forEach(op => {
+    const len = typeof op.insert === 'string' ? op.insert.length : 1;
+    const bg = op.attributes && op.attributes.background;
+    if (bg && isProvenanceBackground(bg)) keep.push([range.index + off, len, bg]);
+    off += len;
+  });
+  runAsSystemInsert(() => {
+    quill.removeFormat(range.index, range.length, 'user');
+    keep.forEach(([i, len, bg]) => quill.formatText(i, len, 'background', bg, 'user'));
+  });
+  quill.setSelection(range.index, range.length, 'silent');
+}
+
+/* ---- Teclado: telemetría de proceso + biometría ---- */
 function handleKeystrokeEvent(e) {
-  // Solo registrar para telemetría (el conteo de palabras ya lo hace text-change)
+  // Los atajos (Ctrl+Z, Ctrl+V, Ctrl+S, Ctrl+B…) no son escritura: no cuentan como
+  // pulsaciones ni alimentan la huella biométrica.
+  if (e.ctrlKey || e.metaKey) return;
   const ignore = ['Control','Alt','Shift','Meta','CapsLock','Tab','Escape',
     'ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown',
     'F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
   if (!ignore.includes(e.key)) {
     App.session.keystroke_count++;
   }
-  // Procesar dinámica de pulsación para huella biométrica
+
+  // Ritmo y pausas (proceso de composición)
+  const pr = App.session.process;
+  const now = performance.now();
+  if (App.session.lastKeyTime) {
+    const gap = now - App.session.lastKeyTime;
+    if (gap < 30000) pr.active_ms += gap;
+    if (gap >= 2000 && gap < 30000) pr.pauses_2s++;
+  }
+  App.session.lastKeyTime = now;
+  if (e.key === 'Backspace' || e.key === 'Delete') pr.backspaces++;
+  else if (e.key && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Unidentified' || e.key === 'Process')) pr.text_keys++;
+
   BiometricsEngine.onKeyDown(e);
 }
 
 function handleKeyUpEvent(e) {
-  // Medir permanencia y pausas entre teclas para la huella biométrica
   BiometricsEngine.onKeyUp(e);
 }
 
@@ -767,65 +1091,178 @@ function initSessionTimer() {
     clearInterval(App.session.timer_ref);
     App.session.timer_ref = null;
   }
-  App.session.start_time = new Date();
+  if (!App.session.start_time) App.session.start_time = new Date();
   App.session.timer_ref = setInterval(() => {
     if (!App.session.start_time) return;
     const elapsed = Math.floor((Date.now() - App.session.start_time.getTime()) / 1000);
-    const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const hh = Math.floor(elapsed / 3600);
+    const mm = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
     const ss = String(elapsed % 60).padStart(2, '0');
+    const txt = hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
     const teleTimerEl = document.getElementById('tele-session-time');
     const sbTimerEl   = document.getElementById('sb-session-time');
-    if (teleTimerEl) teleTimerEl.textContent = `${mm}:${ss}`;
-    if (sbTimerEl)   sbTimerEl.textContent   = `Sesión: ${mm}:${ss}`;
+    if (teleTimerEl) teleTimerEl.textContent = txt;
+    if (sbTimerEl)   sbTimerEl.textContent   = `Sesión: ${txt}`;
   }, 1000);
 }
 
+/* ----------------------------------------------------------------
+   CONTEO DE PALABRAS (incluye el texto de las tablas)
+   ---------------------------------------------------------------- */
+function tablesText() {
+  return Array.from(document.querySelectorAll('#quill-editor .academic-table td, #quill-editor .academic-table th'))
+    .map(c => c.textContent || '').join(' ');
+}
+function docWordCount() {
+  if (!App.quill) return 0;
+  return countWords(App.quill.getText()) + countWords(tablesText());
+}
+
+/* ----------------------------------------------------------------
+   REGISTRO DE LA SESIÓN ACTUAL (lo usan el guardado y el panel)
+   ---------------------------------------------------------------- */
+function buildCurrentSessionRecord() {
+  const now = new Date();
+  const startTime = App.session.start_time || now;
+  const currentWC = docWordCount();
+  const bm = App.session.biometrics.metrics;
+  const nonInitialChars = (App.session.paste_events || [])
+    .filter(ev => EOTS.pasteKind(ev) === 'paste')
+    .reduce((sum, ev) => sum + (ev.chars_pasted || 0), 0);
+  return {
+    session_id:         App.session.id,
+    session_number:     App.session.session_number,
+    date:               startTime.toISOString().split('T')[0],
+    start_time:         startTime.toISOString(),
+    end_time:           now.toISOString(),
+    duration_minutes:   Math.max(1, Math.round((now.getTime() - startTime.getTime()) / 60000)),
+    active_minutes:     Math.round((App.session.process.active_ms || 0) / 60000),
+    device:             App.device ? { ...App.device } : null,
+    app_version:        APP_VERSION,
+    initial_word_count: App.session.initial_word_count || 0,
+    final_word_count:   currentWC,
+    words_net_change:   currentWC - (App.session.initial_word_count || 0),
+    words_typed:        App.session.words_typed,
+    chars_pasted:       nonInitialChars,             // solo pegados SIN declarar
+    paste_events:       [...App.session.paste_events],
+    keystroke_count:    App.session.keystroke_count,
+    process:            { ...App.session.process },
+    timeline:           App.session.timeline.slice(-1500),
+    biometrics: (BiometricsEngine.applies() && bm && bm.samples >= EOTS.POLICY.BIO_MIN_SAMPLES) ? {
+      device_class:     'keyboard',
+      samples:          bm.samples,
+      mean_dwell_ms:    bm.mean_dwell_ms,
+      mean_flight_ms:   bm.mean_flight_ms,
+      similarity_score: bm.similarity_score,
+      is_consistent:    bm.similarity_score >= EOTS.POLICY.BIO_OK,
+    } : {
+      device_class:     App.device?.class || 'keyboard',
+      samples:          App.session.biometrics.samples.length,
+      similarity_score: null,
+      not_applicable:   !BiometricsEngine.applies(),
+    },
+  };
+}
+
+/** Copia del proyecto con el contenido y la sesión actuales (para calcular métricas en vivo). */
+function projectSnapshotForAnalytics() {
+  const p = { ...App.project };
+  p.content = { delta: App.quill ? App.quill.getContents() : App.project.content.delta, html: '' };
+  const sessions = (App.project.telemetry?.sessions || []).slice();
+  if (App.session.id) {
+    const rec = buildCurrentSessionRecord();
+    const i = sessions.findIndex(s => s.session_id === rec.session_id);
+    if (i >= 0) sessions[i] = rec; else sessions.push(rec);
+  }
+  p.telemetry = { ...(App.project.telemetry || {}), sessions };
+  return p;
+}
+
+/* ----------------------------------------------------------------
+   PANEL "ACTIVIDAD Y SALUD" — ACUMULADO DE TODAS LAS SESIONES
+   Y DISPOSITIVOS (mismas reglas que el panel docente: analytics.js)
+   ---------------------------------------------------------------- */
+const PROV_BAR_COLORS = {
+  typed: 'rgba(16,185,129,0.85)', notes: 'rgba(74,108,247,0.75)', quote: 'rgba(20,184,166,0.75)',
+  ai: 'rgba(245,158,11,0.85)', paste: 'rgba(229,57,53,0.80)',
+};
+let teleTimer = null;
+function scheduleTelemetryUI() {
+  clearTimeout(teleTimer);
+  teleTimer = setTimeout(updateTelemetryUI, 500);
+}
+
 function updateTelemetryUI() {
-  const typed = App.session.words_typed;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-  // Solo contar pastes NO iniciales para el ratio de la sesión actual
-  const penalizedPasteWords = App.session.paste_events
-    .filter(ev => !ev.is_initial)
-    .reduce((sum, ev) => sum + (ev.approx_words || 0), 0);
+  // ---- Sesión actual ----
+  set('tele-words-typed', App.session.words_typed);
+  set('tele-paste-count', App.session.paste_events.length);
+  set('tele-device-label', App.device?.label || '—');
 
-  const total = typed + penalizedPasteWords;
-  // Si no hay actividad aún, ratio = 100% (no mostrar 0)
-  const ratio = total > 0 ? Math.round((typed / total) * 100) : 100;
+  // Si el panel está cerrado no se recalcula todo (se hace al abrirlo)
+  const panel = document.getElementById('sidebar-telemetry');
+  if (panel && panel.classList.contains('collapsed') && !App.ui.forceTelemetry) return;
 
-  const wordsTypedEl = document.getElementById('tele-words-typed');
-  if (wordsTypedEl) wordsTypedEl.textContent = typed;
-  const pasteCountEl = document.getElementById('tele-paste-count');
-  if (pasteCountEl) pasteCountEl.textContent = App.session.paste_events.filter(ev => !ev.is_initial).length;
+  const m = EOTS.computeMetrics(projectSnapshotForAnalytics());
+  const alerts = EOTS.computeAlerts(m);
+  App.ui.lastMetrics = m;
 
-  // Barra de salud
+  // ---- Salud: % del texto final tecleado ----
+  const ratio = Math.round((m.typed_share || 0) * 100);
   const fill = document.getElementById('health-fill');
-  const pct  = document.getElementById('health-percent');
-  if (fill && pct) {
+  if (fill) {
     fill.style.width = `${ratio}%`;
-    pct.textContent  = `${ratio}%`;
     fill.classList.remove('medium', 'low');
-    if (ratio < 50) fill.classList.add('low');
-    else if (ratio < 75) fill.classList.add('medium');
+    if (m.typed_share < EOTS.POLICY.TYPED_DANGER) fill.classList.add('low');
+    else if (m.typed_share < EOTS.POLICY.TYPED_WARN) fill.classList.add('medium');
+  }
+  set('health-percent', m.word_count === 0 ? '—' : `${ratio}%`);
+
+  // ---- Desglose de procedencia ----
+  const bar = document.getElementById('prov-bar');
+  const legend = document.getElementById('prov-legend');
+  if (bar && legend) {
+    const sh = m.provenance?.shares;
+    const kinds = ['typed', 'notes', 'quote', 'ai', 'paste'];
+    if (sh && m.provenance.body > 0) {
+      bar.innerHTML = kinds.filter(k => sh[k] > 0).map(k =>
+        `<span title="${EOTS.PROVENANCE[k].label}: ${EOTS.pct(sh[k])}" style="width:${(sh[k] * 100).toFixed(2)}%;background:${PROV_BAR_COLORS[k]}"></span>`).join('');
+      legend.innerHTML = kinds.map(k => `<div class="tele-stat"><span class="text-sm text-muted">${EOTS.PROVENANCE[k].label}</span><span class="tele-stat-value">${EOTS.pct(sh[k])}</span></div>`).join('');
+    } else {
+      bar.innerHTML = '';
+      legend.innerHTML = '<p class="text-sm text-muted">Aún no hay texto en el documento.</p>';
+    }
   }
 
-  // Fuentes con captura
-  const withImg    = (App.project.sources || []).filter(s => s.screenshot_filename).length;
-  const totalSrcs  = (App.project.sources || []).length;
-  const sourcesImgEl = document.getElementById('tele-sources-with-img');
-  if (sourcesImgEl) sourcesImgEl.textContent = `${withImg}/${totalSrcs}`;
+  // ---- Totales del proyecto (todas las sesiones, todos los dispositivos) ----
+  // Con registro del curso se usan las cifras del servidor: incluyen las sesiones de TODOS
+  // los dispositivos aunque el paquete no se haya llevado de uno a otro.
+  const server = (window.Cloud && Cloud.enabled && Cloud.isLoggedIn() && Cloud.estado && Cloud.estado.metrics) ? Cloud.estado : null;
+  const sm = server ? server.metrics : null;
+  const tot = sm && sm.total_sessions >= m.total_sessions ? sm : m;
+  set('tele-totals-source', server
+    ? `Según el registro del curso · actualizado ${new Date(server.updated).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Calculado en este dispositivo');
+  set('tele-total-sessions', tot.total_sessions);
+  set('tele-days-active', tot.total_days_active);
+  set('tele-devices', tot.devices.length ? tot.devices.map(d => d.label).join(', ') : '—');
+  set('tele-total-typed', tot.total_words_typed.toLocaleString('es'));
+  const declared = tot.pastes.notes.n + tot.pastes.quote.n + tot.pastes.ai.n;
+  set('tele-pastes-declared', declared);
+  set('tele-pastes-undeclared', tot.pastes.paste.n);
+  set('tele-sources-with-img', `${m.sources_with_screenshot}/${m.sources_count}`);
+  set('tele-revision', tot.process.revision_ratio === null ? '—' : EOTS.pct(tot.process.revision_ratio));
 
-  // Totales acumulados históricos
-  const totalSessionsCount = (App.project.telemetry?.sessions || []).length || 1;
-  const totalSessionsEl = document.getElementById('tele-total-sessions');
-  if (totalSessionsEl) totalSessionsEl.textContent = totalSessionsCount;
-
-  const daysActiveEl = document.getElementById('tele-days-active');
-  if (daysActiveEl) {
-    const daysSet = new Set((App.project.telemetry?.sessions || []).map(s => s.date).filter(Boolean));
-    if (App.session.start_time) {
-      daysSet.add(App.session.start_time.toISOString().split('T')[0]);
-    }
-    daysActiveEl.textContent = daysSet.size || 1;
+  // ---- Lo que verá el docente ----
+  const al = document.getElementById('tele-alerts');
+  if (al) {
+    // Las alertas del servidor consideran todos los dispositivos; si aún no hay, las locales
+    const source = server && server.alerts ? server.alerts : alerts;
+    const visible = source.filter(a => a.level !== 'info' || ['ai_present', 'bio_none', 'other_projects'].includes(a.code));
+    al.innerHTML = visible.length
+      ? visible.map(a => `<div class="tele-alert tele-alert-${a.level}">${a.level === 'danger' ? '⚠' : a.level === 'warning' ? '!' : 'ℹ'} ${escapeHtml(a.message)}</div>`).join('')
+      : '<div class="tele-alert tele-alert-ok">✓ Sin observaciones por ahora.</div>';
   }
 }
 
@@ -902,6 +1339,7 @@ async function openOrCreateProject(mode) {
   try {
     const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     App.dirHandle = dirHandle;
+    App.jsonFileHandle = null; // a partir de ahora se guarda en la carpeta
     App.folderName = dirHandle.name;
     localStorage.setItem('eots-last-folder-name', dirHandle.name);
 
@@ -939,20 +1377,27 @@ async function openOrCreateProject(mode) {
   }
 }
 
-async function createNewProjectDirectly() {
-  resetSessionTimers();
-  App.dirHandle = null;
-  App.capturasHandle = null;
-
-  // Inicializar metadatos del proyecto
-  App.project.metadata.created_at = new Date().toISOString();
+/** Deja el editor y el estado en blanco para un documento nuevo (sin arrastrar datos del anterior). */
+function resetToBlankProject() {
+  App.project = freshProjectTemplate();
   App.project.metadata.title = 'Sin título';
   const titleInput = document.getElementById('doc-title-input');
   if (titleInput) titleInput.value = '';
+  if (App.quill) App.quill.setText('', 'silent');
+  renderSourcesList();
+  updateTableOfContents();
+  updateWordCount(0);
+}
 
-  if (App.quill) {
-    App.quill.setText('');
-  }
+async function createNewProjectDirectly() {
+  if (window.Cloud && !Cloud.confirmNewDocument()) return;
+  resetSessionTimers();
+  App.dirHandle = null;
+  App.capturasHandle = null;
+  App.jsonFileHandle = null;
+  App.jsonFileName = 'documento.json';
+
+  resetToBlankProject();
 
   startProjectSession();
   await saveProject();
@@ -967,6 +1412,7 @@ async function createNewProjectDirectly() {
   startAutosave();
   SoundFx.play('session_start');
   showToast('✓ Documento listo. Tu trabajo se guarda continuamente en este dispositivo.', 'success');
+  promptAuthorIfMissing();
 }
 
 function resetSessionTimers() {
@@ -981,149 +1427,181 @@ function resetSessionTimers() {
 }
 
 function startProjectSession() {
-  const currentText = App.quill ? App.quill.getText() : '';
-  const currentWC = countWords(currentText);
+  const currentWC = docWordCount();
 
   // Asegurar estructura de telemetría en el proyecto
-  if (!App.project.telemetry) {
-    App.project.telemetry = { sessions: [], summary: {} };
-  }
-  if (!Array.isArray(App.project.telemetry.sessions)) {
-    App.project.telemetry.sessions = [];
-  }
+  if (!App.project.telemetry) App.project.telemetry = { sessions: [], summary: {} };
+  if (!Array.isArray(App.project.telemetry.sessions)) App.project.telemetry.sessions = [];
 
-  const sessionNum = App.project.telemetry.sessions.length + 1;
+  const sessions = App.project.telemetry.sessions;
+  const last = sessions[sessions.length - 1];
   const now = new Date();
 
-  App.session.id = 'ses_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-  App.session.session_number = sessionNum;
-  App.session.start_time = now;
-  App.session.words_typed = 0;
-  App.session.chars_pasted = 0;
-  App.session.paste_events = [];
-  App.session.keystroke_count = 0;
-  App.session.initial_word_count = currentWC;
-  App.session.previousWordCount = currentWC;
-  App.session.passedMilestones = new Set();
+  // Recargar la página (o que el celular suspenda la pestaña) dentro de 30 minutos en el
+  // MISMO dispositivo continúa la misma sesión en lugar de inflar el conteo de sesiones.
+  const canResume = !!(last && App.device && last.device?.id === App.device.id && last.end_time &&
+    (now.getTime() - Date.parse(last.end_time)) < EOTS.POLICY.SESSION_RESUME_MINUTES * 60000);
 
-  // Inicializar o reiniciar telemetría biométrica para la nueva sesión
+  if (canResume) {
+    App.session.id = last.session_id;
+    App.session.session_number = last.session_number || sessions.length;
+    App.session.start_time = new Date(last.start_time || now);
+    App.session.words_typed = last.words_typed || 0;
+    App.session.paste_events = [...(last.paste_events || [])];
+    App.session.keystroke_count = last.keystroke_count || 0;
+    App.session.initial_word_count = (typeof last.initial_word_count === 'number') ? last.initial_word_count : currentWC;
+    App.session.process = { ...freshProcessStats(), ...(last.process || {}) };
+    App.session.timeline = [...(last.timeline || [])];
+    App.session.resumed = true;
+  } else {
+    App.session.id = 'ses_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    App.session.session_number = sessions.length + 1;
+    App.session.start_time = now;
+    App.session.words_typed = 0;
+    App.session.paste_events = [];
+    App.session.keystroke_count = 0;
+    App.session.initial_word_count = currentWC;
+    App.session.process = freshProcessStats();
+    App.session.timeline = [];
+    App.session.resumed = false;
+  }
+  App.session.chars_pasted = 0;
+  App.session.previousWordCount = currentWC;
+  App.session.lastKeyTime = 0;
+  App.session.lastEditIndex = null;
+  // Los hitos ya superados por el documento existente no deben "celebrarse" de golpe
+  App.session.passedMilestones = new Set(
+    [100, 250, 500, 750, 1000, 1500, 2000, 2500, 3000, 5000].filter(m => m <= currentWC)
+  );
+
+  // Biometría: siempre se mide de cero en cada sesión (no se arrastran métricas)
   App.session.biometrics = {
     activeKeyDowns:   new Map(),
     lastKeyUpTime:    0,
     samples:          [],
     spaceDwells:      [],
     backspaceDwells:  [],
-    notifiedBaseline: !!(App.project.biometrics && App.project.biometrics.baseline),
+    notifiedBaseline: !!BiometricsEngine.baseline(),
+    metrics:          null,
   };
 
   initSessionTimer();
+  App.ui.forceTelemetry = true;
   updateTelemetryUI();
+  App.ui.forceTelemetry = false;
   BiometricsEngine.updateUI();
+  return canResume;
 }
 
 async function createNewProject(dirHandle) {
+  if (window.Cloud && !Cloud.confirmNewDocument()) return;
   resetSessionTimers();
-  // Inicializar metadatos del proyecto
-  App.project.metadata.created_at = new Date().toISOString();
-  App.project.metadata.title = 'Sin título';
-  document.getElementById('doc-title-input').value = '';
+  App.jsonFileName = 'documento.json';
+  resetToBlankProject();
 
   startProjectSession();
   await saveProject();
   SoundFx.play('session_start');
   showToast('Proyecto creado. El autoguardado está activo.', 'success');
+  promptAuthorIfMissing();
+}
+
+/** Lee un .zip de proyecto y devuelve { parsed, name } sin cargarlo. */
+async function readBundle(fileOrBlob) {
+  if (!window.JSZip) throw new Error('No se pudo cargar el lector de paquetes .zip (revisa tu conexión la primera vez).');
+  const zip = await JSZip.loadAsync(fileOrBlob);
+  let entry = zip.file('proyecto.json');
+  if (!entry) entry = zip.file(/^[^/]+\.json$/i)[0] || zip.file(/\.json$/i).find(f => !f.name.startsWith('capturas/'));
+  if (!entry) throw new Error('El paquete no contiene el archivo proyecto.json.');
+  const parsed = JSON.parse(await entry.async('string'));
+  return { zip, parsed };
+}
+
+/** Restaura en el almacén portable las capturas que vienen en un paquete .zip. */
+async function importBundleCaptures(zip, parsed) {
+  const project = migrateProject(safeClone(parsed));
+  const pid = project.metadata.project_id;
+  const registry = project.captures || {};
+  const result = { restored: 0, mismatch: 0, extra: 0 };
+  const files = zip.file(/^capturas\/[^/]+$/i);
+  for (const f of files) {
+    const filename = f.name.split('/').pop();
+    const raw = await f.async('blob');
+    const blob = new Blob([raw], { type: mimeFromName(filename) });
+    const entry = registry[filename];
+    if (entry && entry.sha256) {
+      const sha = await CaptureStore.sha256Hex(blob);
+      if (sha !== entry.sha256) result.mismatch++;
+    } else if (!entry) {
+      result.extra++;
+    }
+    await CaptureStore.put(pid, filename, blob);
+    result.restored++;
+  }
+  return result;
+}
+
+function mimeFromName(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  return { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[ext] || 'application/octet-stream';
 }
 
 async function loadExistingProject(dirHandle) {
   resetSessionTimers();
-  try {
-    let jsonHandle = null;
-    let loadedFileName = 'documento.json';
-
-    // 1. Intentar abrir documento.json estándar
-    try {
-      jsonHandle = await dirHandle.getFileHandle('documento.json');
-    } catch (e) {
-      // 2. Si no existe documento.json, buscar si hay algún archivo .json en la carpeta
-      if ('values' in dirHandle) {
-        for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-            jsonHandle = entry;
-            loadedFileName = entry.name;
-            break;
-          }
-        }
-      }
+  // Buscar TODOS los .json (y paquetes .zip) de la carpeta y abrir el más reciente según
+  // metadata.last_saved. Así una copia más nueva traída desde el celular no se ignora.
+  const candidates = [];
+  if ('values' in dirHandle) {
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind !== 'file') continue;
+      const lower = entry.name.toLowerCase();
+      if (!lower.endsWith('.json') && !lower.endsWith('.zip')) continue;
+      try {
+        const f = await entry.getFile();
+        let parsed, zip = null;
+        if (lower.endsWith('.zip')) ({ parsed, zip } = await readBundle(f));
+        else parsed = JSON.parse(await f.text());
+        if (!parsed || typeof parsed !== 'object' || !(parsed.content || parsed.metadata)) continue;
+        const stamp = Date.parse(parsed.metadata?.last_saved || '') || f.lastModified || 0;
+        candidates.push({ name: entry.name, parsed, zip, stamp });
+      } catch (_) { /* no es un proyecto válido */ }
     }
+  }
 
-    if (!jsonHandle) {
-      // No hay ningún archivo .json en la carpeta → es una carpeta nueva
-      await createNewProject(dirHandle);
+  if (candidates.length === 0) {
+    if (App.ui.projectLoaded) {
+      // Carpeta vacía y ya hay un documento abierto → vincularlo (no borrarlo)
+      App.jsonFileName = 'documento.json';
+      App.jsonFileHandle = null;
+      await syncFolderCaptures();
+      await saveProject();
+      showToast(`Carpeta "${dirHandle.name}" vinculada: el documento y sus capturas se guardaron en ella.`, 'success');
       return;
     }
-
-    const file   = await jsonHandle.getFile();
-    const text   = await file.text();
-    const parsed = JSON.parse(text);
-
-    // Verificar firma de integridad
-    const storedSig = parsed._signature;
-    if (storedSig) {
-      const valid = await verifySignature(parsed);
-      if (!valid) {
-        showToast('⚠ El archivo JSON fue modificado externamente. Los datos pueden no ser confiables.', 'warning');
-      }
-    }
-
-    // Cargar datos
-    App.project = { ...App.project, ...parsed };
-    delete App.project._signature;
-
-    // Asegurar estructura biométrica
-    if (!App.project.biometrics) {
-      App.project.biometrics = { baseline: null, session_metrics: null };
-    }
-
-    // Restaurar contenido en Quill
-    if (App.project.content && App.project.content.delta) {
-      App.quill.setContents(App.project.content.delta, 'silent');
-    } else if (App.project.content && App.project.content.html) {
-      App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
-    }
-
-    // Restaurar título
-    const titleInput = document.getElementById('doc-title-input');
-    if (titleInput) {
-      titleInput.value = App.project.metadata.title || '';
-      // Actualizar el título de la pestaña del navegador
-      document.title = `${titleInput.value || 'Sin título'} — Eye on the Sky`;
-    }
-
-    // Cargar fuentes en el panel
-    renderSourcesList();
-    updateTableOfContents();
-    updatePageMetrics();
-    setTimeout(() => adjustAllTablesWrapping(), 120);
-
-    // Contar palabras
-    const currentWC = countWords(App.quill.getText());
-    updateWordCount(currentWC);
-
-    // Inicializar nueva sesión de trabajo con el punto de partida actual
-    startProjectSession();
-
-    // Guardar para registrar la apertura de la nueva sesión
-    await saveProject();
-
-    SoundFx.play('session_start');
-    showToast(`Proyecto "${App.project.metadata.title || loadedFileName}" cargado.`, 'success');
-    updateSaveStatus('saved');
-    BiometricsEngine.updateUI();
-
-  } catch (err) {
-    console.error('Error al cargar proyecto de carpeta:', err);
-    throw err;
+    await createNewProject(dirHandle);
+    return;
   }
+
+  candidates.sort((a, b) => b.stamp - a.stamp);
+  const chosen = candidates[0];
+  if (candidates.length > 1) {
+    showToast(`Hay ${candidates.length} archivos de proyecto en la carpeta; se abrió el más reciente: "${chosen.name}".`, 'info');
+  }
+
+  if (chosen.zip) {
+    // El más reciente es un paquete (p. ej. traído del celular): restaurar sus capturas y
+    // seguir guardando en el .json del mismo proyecto que haya en la carpeta.
+    const res = await importBundleCaptures(chosen.zip, chosen.parsed);
+    const pid = migrateProject(safeClone(chosen.parsed)).metadata.project_id;
+    const sameJson = candidates.find(c => !c.zip && migrateProject(safeClone(c.parsed)).metadata.project_id === pid);
+    App.jsonFileName = sameJson ? sameJson.name : 'documento.json';
+    if (res.restored) showToast(`${res.restored} captura(s) restaurada(s) desde "${chosen.name}".`, 'info');
+  } else {
+    // Guardar de vuelta en el MISMO archivo que se abrió (no en otro documento.json)
+    App.jsonFileName = chosen.name;
+  }
+  App.jsonFileHandle = null;
+  await loadProjectFromParsedJSON(chosen.parsed, chosen.name, { keepFolder: true, fromFolder: true });
 }
 
 function readFileAsText(file) {
@@ -1132,64 +1610,143 @@ function readFileAsText(file) {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result || '');
       reader.onerror = (e) => {
-        if (file && typeof file.text === 'function') {
-          file.text().then(resolve).catch(reject);
-        } else {
-          reject(e);
-        }
+        if (file && typeof file.text === 'function') file.text().then(resolve).catch(reject);
+        else reject(e);
       };
       reader.readAsText(file);
     } catch (err) {
-      if (file && typeof file.text === 'function') {
-        file.text().then(resolve).catch(reject);
-      } else {
-        reject(err);
-      }
+      if (file && typeof file.text === 'function') file.text().then(resolve).catch(reject);
+      else reject(err);
     }
   });
 }
 
-async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') {
+/**
+ * Normaliza proyectos de versiones anteriores al esquema 2:
+ * identificador estable, registro de capturas, huella biométrica por tipo de dispositivo.
+ */
+function migrateProject(p) {
+  if (!p.metadata) p.metadata = {};
+  const md = p.metadata;
+  if (!md.project_id) {
+    // Id determinista: el mismo proyecto abierto en dos dispositivos obtiene el mismo id
+    md.project_id = 'prj_legacy_' + String(md.created_at || md.title || 'sin_fecha').replace(/[^0-9A-Za-z]/g, '');
+  }
+  if (md.student_email === undefined) md.student_email = '';
+  if (md.student_name === undefined) md.student_name = '';
+  if (!p.captures || typeof p.captures !== 'object') p.captures = {};
+  // Capturas insertadas en el texto con la versión anterior
+  Object.entries(p.inline_screenshots || {}).forEach(([placeholder, info]) => {
+    if (info && info.filename && !p.captures[info.filename]) {
+      p.captures[info.filename] = {
+        sha256: null, mime: info.mime_type || mimeFromName(info.filename), size: info.size || 0,
+        created_at: info.inserted_at || null, source_id: null, caption: '', legacy: true,
+      };
+    }
+  });
+  // Capturas de evidencia de fuentes con la versión anterior
+  (p.sources || []).forEach(src => {
+    if (src.screenshot_filename && !p.captures[src.screenshot_filename]) {
+      p.captures[src.screenshot_filename] = {
+        sha256: null, mime: mimeFromName(src.screenshot_filename), size: 0,
+        created_at: src.added_at || null, source_id: src.id, caption: src.title || '', legacy: true,
+      };
+    }
+  });
+  if (!p.biometrics) p.biometrics = {};
+  if (!p.biometrics.baselines) p.biometrics.baselines = {};
+  if (!p.biometrics.baselines.keyboard && p.biometrics.baseline) p.biometrics.baselines.keyboard = p.biometrics.baseline;
+  delete p.has_initial_paste;
+  return p;
+}
+
+/** Convierte los antiguos marcadores de texto "[📸 Captura: archivo]" en imágenes reales. */
+function convertLegacyCapturePlaceholders() {
+  if (!App.quill) return;
+  const text = App.quill.getText();
+  const re = /\[📸 Captura: ([^\]\n]+)\]/g;
+  const found = [];
+  let m;
+  while ((m = re.exec(text)) !== null) found.push({ index: m.index, length: m[0].length, filename: m[1].trim() });
+  for (let i = found.length - 1; i >= 0; i--) {
+    const f = found[i];
+    App.quill.deleteText(f.index, f.length, 'silent');
+    App.quill.insertEmbed(f.index, 'eots-capture', { filename: f.filename, caption: '' }, 'silent');
+  }
+}
+
+async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json', opts = {}) {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('El archivo no contiene un formato JSON válido.');
   }
+  const incoming = migrateProject(safeClone(parsed));
 
-  resetSessionTimers();
-
-  // Verificar firma de integridad si existe
-  const storedSig = parsed._signature;
-  if (storedSig) {
-    try {
-      const valid = await verifySignature(parsed);
-      if (!valid) {
-        showToast('⚠ El archivo JSON fue modificado externamente. Firma alterada.', 'warning');
-      }
-    } catch (e) {
-      console.debug('Error en validación de firma:', e);
+  // Protección entre dispositivos (mismo proyecto abierto aquí y en el archivo elegido)
+  if (!opts.silentRestore && App.ui.projectLoaded &&
+      incoming.metadata.project_id === App.project.metadata?.project_id) {
+    const fileIds = new Set((incoming.telemetry?.sessions || []).map(s => s.session_id));
+    const hereIds = new Set((App.project.telemetry?.sessions || []).map(s => s.session_id));
+    if (App.session.id) hereIds.add(App.session.id);
+    const onlyHere = [...hereIds].filter(id => !fileIds.has(id));
+    const onlyFile = [...fileIds].filter(id => !hereIds.has(id));
+    const fileStamp = Date.parse(incoming.metadata?.last_saved || '') || 0;
+    const hereStamp = Date.parse(App.project.metadata?.last_saved || '') || 0;
+    const fmt = (t) => new Date(t).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
+    let question = null;
+    if (onlyHere.length && onlyFile.length) {
+      question = `ATENCIÓN: este dispositivo y el archivo "${sourceName}" tienen versiones que se SEPARARON ` +
+        `(se trabajó en ambos sin llevar el archivo de uno a otro).\n\n` +
+        `• ${onlyHere.length} sesión(es) existen solo en este dispositivo y se perderán.\n` +
+        `• ${onlyFile.length} sesión(es) existen solo en el archivo.\n\n` +
+        `¿Reemplazar la versión de este dispositivo por la del archivo?`;
+    } else if (onlyHere.length && fileStamp && hereStamp && fileStamp < hereStamp) {
+      question = `El archivo "${sourceName}" es una versión ANTERIOR de este proyecto.\n\n` +
+        `• Archivo elegido: guardado ${fmt(fileStamp)}\n` +
+        `• Versión abierta en este dispositivo: guardada ${fmt(hereStamp)}\n\n` +
+        `¿Reemplazar la versión de este dispositivo por la del archivo?`;
+    }
+    if (question && !confirm(question)) {
+      showToast('Se conservó la versión de este dispositivo.', 'info');
+      return false;
     }
   }
 
-  App.project = { ...App.project, ...parsed };
+  // Guardar el progreso de la sesión que se está cerrando antes de reemplazarla
+  if (App.ui.projectLoaded && App.ui.isDirty && !opts.silentRestore) {
+    try { await saveProject({ force: true }); } catch (_) {}
+  }
+  resetSessionTimers();
+
+  // Destino de los guardados
+  if (opts.fileHandle) {
+    // .json o .zip abierto en PC con permiso de escritura: se guarda EN ESE MISMO ARCHIVO
+    App.jsonFileHandle = opts.fileHandle;
+    App.dirHandle = null;
+    App.capturasHandle = null;
+  } else if (opts.keepFolder) {
+    App.jsonFileHandle = null;
+  } else if (!opts.silentRestore) {
+    // Archivo suelto sin permiso de escritura: desvincular la carpeta para no sobrescribir
+    // el proyecto que ella contiene con otro distinto.
+    if (App.dirHandle) showToast('Se desvinculó la carpeta anterior para no sobrescribir su proyecto.', 'info');
+    App.jsonFileHandle = null;
+    App.dirHandle = null;
+    App.capturasHandle = null;
+  }
+
+  // Verificar firma de integridad si existe
+  if (parsed._signature) {
+    try {
+      const valid = await verifySignature(parsed);
+      if (!valid) showToast('⚠ El archivo JSON fue modificado externamente. Firma alterada.', 'warning');
+    } catch (e) { console.debug('Error en validación de firma:', e); }
+  }
+
+  // Fusionar sobre una plantilla limpia (nada del proyecto anterior se hereda)
+  App.project = migrateProject({ ...freshProjectTemplate(), ...incoming });
   delete App.project._signature;
-
-  if (!App.project.metadata) {
-    App.project.metadata = { title: (sourceName || 'documento').replace('.json', '') };
-  }
-
-  if (!App.project.biometrics) {
-    App.project.biometrics = { baseline: null, session_metrics: null };
-  }
-
-  if (!Array.isArray(App.project.sources)) {
-    App.project.sources = [];
-  }
-
-  // Detectar si el proyecto importado ya tiene pegado inicial
-  if (App.project.has_initial_paste === undefined) {
-    App.project.has_initial_paste = (App.project.telemetry?.sessions || []).some(s => 
-      (s.paste_events || []).some(p => p.is_initial)
-    );
-  }
+  if (!parsed.metadata?.title) App.project.metadata.title = (sourceName || 'documento').replace(/\.(json|zip)$/i, '');
+  if (!Array.isArray(App.project.sources)) App.project.sources = [];
 
   // Restaurar contenido en Quill de forma segura
   if (App.quill) {
@@ -1197,67 +1754,93 @@ async function loadProjectFromParsedJSON(parsed, sourceName = 'documento.json') 
       if (App.project.content && App.project.content.delta) {
         App.quill.setContents(App.project.content.delta, 'silent');
       } else if (App.project.content && App.project.content.html) {
-        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
+        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html, 'silent');
       }
     } catch (quillErr) {
       console.warn('Error al cargar delta en Quill, usando HTML plano:', quillErr);
       if (App.project.content && App.project.content.html) {
-        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html);
+        App.quill.clipboard.dangerouslyPasteHTML(App.project.content.html, 'silent');
       }
     }
+    convertLegacyCapturePlaceholders();
   }
 
   const titleInput = document.getElementById('doc-title-input');
-  if (titleInput) titleInput.value = App.project.metadata.title || '';
+  if (titleInput) {
+    titleInput.value = App.project.metadata.title || '';
+    document.title = `${titleInput.value || 'Sin título'} — Eye on the Sky`;
+  }
+  syncAuthorInputs();
 
   renderSourcesList();
   updateTableOfContents();
   updatePageMetrics();
   setTimeout(() => adjustAllTablesWrapping(), 120);
 
-  const currentWC = countWords(App.quill ? App.quill.getText() : '');
-  updateWordCount(currentWC);
-  startProjectSession();
+  updateWordCount(docWordCount());
+  const resumed = startProjectSession();
 
   App.ui.projectLoaded = true;
 
   const sbName = document.getElementById('sb-project-name');
-  if (sbName) sbName.textContent = sourceName;
-  // El botón con el ícono de carpeta muestra siempre el nombre de la carpeta elegida, nunca el archivo JSON
+  if (sbName) sbName.textContent = App.dirHandle ? App.dirHandle.name : sourceName;
   updateFolderButtonUI();
 
-  // Iniciar autoguardado periódico para que la sesión mantenga guardado automático (móvil y PC)
+  if (App.dirHandle) await syncFolderCaptures();
+
   startAutosave();
-
-  // Guardar inmediatamente con firma criptográfica válida
-  await saveProject();
-
-  // Cerrar siempre el modal de bienvenida
+  await saveProject({ force: true });
   closeModal('modal-onboarding-overlay');
 
-  try {
-    SoundFx.play('session_start');
-  } catch (e) {}
+  try { SoundFx.play('session_start'); } catch (e) {}
 
-  showToast(`✓ Proyecto "${App.project.metadata.title || sourceName}" cargado exitosamente.`, 'success');
-  updateSaveStatus('saved');
-  if (BiometricsEngine.updateUI) BiometricsEngine.updateUI();
+  if (!opts.silentRestore || !resumed) {
+    if (App.jsonFileHandle) {
+      showToast(`✓ Proyecto cargado. Los cambios se guardarán directamente en "${App.jsonFileHandle.name}".`, 'success');
+    } else if (App.dirHandle) {
+      showToast(`✓ Proyecto "${App.project.metadata.title || sourceName}" cargado desde la carpeta.`, 'success');
+    } else if (!opts.silentRestore) {
+      showToast(`✓ Proyecto "${App.project.metadata.title || sourceName}" cargado. Para llevarlo a otro dispositivo usa Exportar › Paquete del proyecto (.zip).`, 'success');
+    }
+  }
+  if (resumed && opts.silentRestore) showToast('Sesión de trabajo reanudada.', 'info');
+  updateSaveStatus('saved', App.project.metadata.last_saved);
+  BiometricsEngine.updateUI();
+  refreshAllCaptureNodes();
+  reportMissingCaptures();
+  promptAuthorIfMissing();
+  if (window.Cloud) Cloud.render();
+  return true;
 }
 
-async function loadProjectFromJSONFile(file) {
+async function loadProjectFromJSONFile(file, fileHandle = null) {
   if (!file) return;
   showToast('Cargando documento...', 'info');
-
   try {
-    const text = await readFileAsText(file);
-    if (!text || !text.trim()) {
-      throw new Error('El archivo seleccionado está vacío.');
+    const name = file.name || 'documento.json';
+    let isZip = /\.zip$/i.test(name);
+    if (!isZip) {
+      const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+      isZip = head[0] === 0x50 && head[1] === 0x4B; // "PK"
     }
+    if (isZip) {
+      const { zip, parsed } = await readBundle(file);
+      const res = await importBundleCaptures(zip, parsed);
+      const ok = await loadProjectFromParsedJSON(parsed, name, { fileHandle });
+      if (ok !== false) {
+        let msg = `📦 Paquete abierto: ${res.restored} captura(s) restaurada(s).`;
+        if (res.mismatch) msg += ` ⚠ ${res.mismatch} no coinciden con su huella registrada.`;
+        showToast(msg, res.mismatch ? 'warning' : 'success');
+      }
+      return;
+    }
+    const text = await readFileAsText(file);
+    if (!text || !text.trim()) throw new Error('El archivo seleccionado está vacío.');
     const parsed = JSON.parse(text);
-    await loadProjectFromParsedJSON(parsed, file.name || 'documento.json');
+    await loadProjectFromParsedJSON(parsed, name, { fileHandle });
   } catch (err) {
-    console.error('Error al cargar archivo JSON:', err);
-    showToast('Error al abrir el JSON: ' + err.message, 'error');
+    console.error('Error al cargar archivo:', err);
+    showToast('Error al abrir el archivo: ' + err.message, 'error');
   }
 }
 
@@ -1275,7 +1858,38 @@ async function loadProjectFromJSONText(text, sourceName = 'documento_pegado.json
   }
 }
 
+/**
+ * En Chrome/Edge de escritorio abre el .json o .zip con showOpenFilePicker para obtener
+ * un handle con permiso de escritura: así el autoguardado actualiza ESE archivo.
+ * Devuelve true si se manejó por esta vía.
+ */
+async function openJsonWithWritableHandle() {
+  if (!('showOpenFilePicker' in window)) return false;
+  let handle;
+  try {
+    [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{ description: 'Proyecto Eye on the Sky (.zip o .json)',
+                accept: { 'application/zip': ['.zip'], 'application/json': ['.json'] } }],
+    });
+  } catch (err) {
+    if (err && err.name === 'AbortError') return true; // el usuario canceló
+    return false; // cualquier otro problema → usar el input clásico
+  }
+  let writable = false;
+  try {
+    writable = (await handle.requestPermission({ mode: 'readwrite' })) === 'granted';
+  } catch (_) {}
+  const file = await handle.getFile();
+  await loadProjectFromJSONFile(file, writable ? handle : null);
+  if (!writable) {
+    showToast('Sin permiso de escritura: tus cambios se guardan en este navegador. Usa "Paquete del proyecto (.zip)" para llevarlos a otro dispositivo.', 'warning');
+  }
+  return true;
+}
+
 async function openJsonFileDialog() {
+  if (await openJsonWithWritableHandle()) return;
   const onboardModal = document.getElementById('modal-onboarding-overlay');
   const isOnboardOpen = onboardModal && onboardModal.classList.contains('open');
   const input = (isOnboardOpen ? document.getElementById('onboard-file-input') : null) ||
@@ -1289,13 +1903,243 @@ async function openJsonFileDialog() {
 
 function safeClone(obj) {
   if (typeof structuredClone === 'function') {
-    try {
-      return structuredClone(obj);
-    } catch (e) {
-      // Ignorar fallback
-    }
+    try { return structuredClone(obj); } catch (e) { /* fallback */ }
   }
   return JSON.parse(JSON.stringify(obj));
+}
+
+/* ================================================================
+   CAPTURAS PORTABLES (IndexedDB + carpeta capturas/ + paquete .zip)
+   ================================================================ */
+
+function projectId() { return App.project?.metadata?.project_id || 'sin_proyecto'; }
+
+async function getCaptureBlob(filename) {
+  let blob = await CaptureStore.get(projectId(), filename);
+  if (!blob && App.capturasHandle) {
+    try {
+      const fh = await App.capturasHandle.getFileHandle(filename);
+      const f = await fh.getFile();
+      blob = new Blob([await f.arrayBuffer()], { type: f.type || mimeFromName(filename) });
+      await CaptureStore.put(projectId(), filename, blob);
+    } catch (_) { blob = null; }
+  }
+  return blob;
+}
+
+async function getCaptureURL(filename) {
+  const url = await CaptureStore.getURL(projectId(), filename);
+  if (url) return url;
+  const blob = await getCaptureBlob(filename);
+  return blob ? CaptureStore.getURL(projectId(), filename) : null;
+}
+
+/** Registra una imagen como captura de evidencia y la guarda en el almacén portable. */
+async function registerCapture(file, { source_id = null, caption = '' } = {}) {
+  const originalSha = await CaptureStore.sha256Hex(file);
+  const processed = await CaptureStore.processImage(file);
+  const sha = processed.blob === file ? originalSha : await CaptureStore.sha256Hex(processed.blob);
+  const filename = CaptureStore.newFilename(processed.mime);
+  await CaptureStore.put(projectId(), filename, processed.blob);
+  if (App.capturasHandle) {
+    try {
+      const fh = await App.capturasHandle.getFileHandle(filename, { create: true });
+      const wr = await fh.createWritable();
+      await wr.write(processed.blob);
+      await wr.close();
+    } catch (err) { console.warn('No se pudo escribir la captura en la carpeta:', err); }
+  }
+  if (!App.project.captures) App.project.captures = {};
+  App.project.captures[filename] = {
+    sha256: sha,
+    original_sha256: originalSha,
+    original_name: file.name || '',
+    mime: processed.mime,
+    size: processed.blob.size,
+    width: processed.width,
+    height: processed.height,
+    created_at: new Date().toISOString(),
+    source_id,
+    caption,
+    device_label: App.device?.label || '',
+  };
+  App.ui.isDirty = true;
+  return filename;
+}
+
+/** Vuelve a adjuntar una captura que falta en este dispositivo (verifica su huella). */
+async function relinkCapture(filename, file) {
+  const entry = App.project.captures?.[filename];
+  if (!entry) return false;
+  const rawSha = await CaptureStore.sha256Hex(file);
+  if (entry.sha256 && (rawSha === entry.sha256)) {
+    await CaptureStore.put(projectId(), filename, file);
+  } else if (entry.original_sha256 && rawSha === entry.original_sha256) {
+    // Es la imagen original: se guarda tal cual y se registra su nueva huella
+    await CaptureStore.put(projectId(), filename, file);
+    entry.sha256 = rawSha;
+    entry.relinked_at = new Date().toISOString();
+  } else {
+    const msg = entry.sha256 || entry.original_sha256
+      ? 'Esta imagen NO es idéntica a la captura original. Si continúas, quedará registrada como REEMPLAZO (el docente lo verá). ¿Continuar?'
+      : 'Esta captura proviene de una versión antigua sin huella registrada. ¿Vincular esta imagen?';
+    if (!confirm(msg)) return false;
+    const processed = await CaptureStore.processImage(file);
+    await CaptureStore.put(projectId(), filename, processed.blob);
+    const wasLegacy = !entry.sha256 && !entry.original_sha256;
+    entry.sha256 = await CaptureStore.sha256Hex(processed.blob);
+    entry.original_sha256 = rawSha;
+    entry.mime = processed.mime; entry.size = processed.blob.size;
+    entry.width = processed.width; entry.height = processed.height;
+    if (wasLegacy) entry.hashed_at = new Date().toISOString();
+    else { entry.replaced = true; entry.replaced_at = new Date().toISOString(); }
+  }
+  if (App.capturasHandle) {
+    try {
+      const blob = await CaptureStore.get(projectId(), filename);
+      const fh = await App.capturasHandle.getFileHandle(filename, { create: true });
+      const wr = await fh.createWritable(); await wr.write(blob); await wr.close();
+    } catch (_) {}
+  }
+  App.ui.isDirty = true;
+  refreshAllCaptureNodes();
+  renderSourcesList();
+  showToast('Captura vinculada nuevamente.', 'success');
+  return true;
+}
+
+function pickImageFile() {
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => resolve(input.files && input.files[0] ? input.files[0] : null);
+    input.click();
+  });
+}
+
+async function relinkCaptureInteractive(filename) {
+  const file = await pickImageFile();
+  if (file) await relinkCapture(filename, file);
+}
+
+/** Carpeta vinculada (PC): importa capturas de capturas/ y escribe allí las que falten. */
+async function syncFolderCaptures() {
+  if (!App.dirHandle) return;
+  try {
+    if (!App.capturasHandle) App.capturasHandle = await App.dirHandle.getDirectoryHandle('capturas', { create: true });
+  } catch (_) { return; }
+  const pid = projectId();
+  for (const [filename, entry] of Object.entries(App.project.captures || {})) {
+    let blob = await CaptureStore.get(pid, filename);
+    let inFolder = null;
+    try {
+      const fh = await App.capturasHandle.getFileHandle(filename);
+      const f = await fh.getFile();
+      inFolder = new Blob([await f.arrayBuffer()], { type: f.type || mimeFromName(filename) });
+    } catch (_) {}
+    if (!blob && inFolder) {
+      await CaptureStore.put(pid, filename, inFolder);
+      blob = inFolder;
+    }
+    if (blob && !entry.sha256) {
+      entry.sha256 = await CaptureStore.sha256Hex(blob); // captura antigua: se calcula su huella
+      entry.size = blob.size;
+      entry.hashed_at = new Date().toISOString();
+      App.ui.isDirty = true;
+    }
+    if (blob && !inFolder) {
+      try {
+        const fh = await App.capturasHandle.getFileHandle(filename, { create: true });
+        const wr = await fh.createWritable(); await wr.write(blob); await wr.close();
+      } catch (_) {}
+    }
+  }
+}
+
+async function missingCaptures() {
+  const missing = [];
+  for (const filename of Object.keys(App.project.captures || {})) {
+    if (!(await CaptureStore.has(projectId(), filename))) missing.push(filename);
+  }
+  return missing;
+}
+
+async function reportMissingCaptures() {
+  const missing = await missingCaptures();
+  if (missing.length) {
+    showToast(`⚠ ${missing.length} captura(s) de este proyecto no están en este dispositivo. Abre el paquete .zip del proyecto o vuelve a adjuntarlas (clic sobre la captura).`, 'warning');
+  }
+  renderSourcesList();
+}
+
+/** Resuelve la imagen de un nodo de captura del documento. */
+async function renderCaptureNode(node) {
+  const filename = node.dataset.filename;
+  const img = node.querySelector('img');
+  const cap = node.querySelector('figcaption');
+  if (!filename || !img) return;
+  const url = await getCaptureURL(filename);
+  if (url) {
+    img.src = url;
+    node.classList.remove('missing');
+    if (cap) cap.textContent = `📸 ${node.dataset.caption || filename}`;
+  } else {
+    img.removeAttribute('src');
+    node.classList.add('missing');
+    if (cap) cap.textContent = `⚠ Captura "${filename}" no disponible en este dispositivo — toca aquí para volver a adjuntarla`;
+  }
+}
+
+function refreshAllCaptureNodes() {
+  document.querySelectorAll('#quill-editor figure.eots-capture').forEach(n => renderCaptureNode(n));
+}
+
+function handleCaptureClick(e) {
+  const fig = e.target.closest && e.target.closest('figure.eots-capture');
+  if (!fig) return;
+  if (fig.classList.contains('missing')) {
+    relinkCaptureInteractive(fig.dataset.filename);
+  } else {
+    getCaptureURL(fig.dataset.filename).then(url => { if (url) window.open(url, '_blank'); });
+  }
+}
+
+/** Genera el paquete portable: proyecto.json + capturas/ + LEEME.txt */
+async function buildBundleBlob(payload) {
+  if (!window.JSZip) throw new Error('El generador de paquetes .zip no está disponible (revisa tu conexión).');
+  const zip = new JSZip();
+  zip.file('proyecto.json', JSON.stringify(payload, null, 2));
+  const folder = zip.folder('capturas');
+  const missing = [];
+  for (const filename of Object.keys(App.project.captures || {})) {
+    const blob = await getCaptureBlob(filename);
+    if (blob) folder.file(filename, blob, { binary: true, compression: 'STORE' });
+    else missing.push(filename);
+  }
+  zip.file('LEEME.txt',
+    'Paquete de proyecto de Eye on the Sky\n' +
+    '=====================================\n' +
+    'Contiene el documento (proyecto.json) y todas sus capturas de evidencia (capturas/).\n\n' +
+    'Para seguir trabajando en otro dispositivo: abre el editor y elige "Abrir archivo"\n' +
+    'seleccionando ESTE .zip (no lo descomprimas). Las capturas se restauran solas.\n' +
+    'Para entregar al docente: envía este mismo .zip.\n');
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }, mimeType: 'application/zip' });
+  return { blob, missing };
+}
+
+async function exportBundle() {
+  await saveProject({ force: true });
+  try {
+    const { blob, missing } = await buildBundleBlob(App.lastPayload);
+    const title = App.project.metadata.title || 'documento';
+    downloadBlob(blob, `${slugify(title)}_paquete.zip`, 'application/zip');
+    SoundFx.play('export_success');
+    if (missing.length) showToast(`Paquete descargado, pero faltan ${missing.length} captura(s) que no están en este dispositivo.`, 'warning');
+    else showToast('📦 Paquete descargado (documento + capturas). Ábrelo tal cual en el otro dispositivo.', 'success');
+  } catch (err) {
+    showToast('No se pudo generar el paquete: ' + err.message, 'error');
+  }
 }
 
 /* ================================================================
@@ -1307,132 +2151,116 @@ function startAutosave() {
   App.session.autosave_ref = setInterval(async () => {
     if (!App.ui.isDirty) return;
     await saveProject();
-  }, 15_000); // cada 15 segundos continuo (en disco o localStorage)
+  }, 15_000); // cada 15 segundos (en disco o en el almacenamiento del navegador)
 }
 
-async function saveProject() {
+let localStorageWarned = false;
+
+async function saveProject(opts = {}) {
   updateSaveStatus('saving');
 
   try {
     // Capturar estado actual del editor
     if (App.quill) {
       App.project.content.delta = App.quill.getContents();
-      App.project.content.html  = App.quill.root.innerHTML;
+      // Las imágenes de captura se resuelven al abrir: no guardar URLs temporales blob:
+      App.project.content.html  = App.quill.root.innerHTML.replace(/\s+src="blob:[^"]*"/g, '');
     }
     const titleInput = document.getElementById('doc-title-input');
     if (titleInput) {
       App.project.metadata.title = titleInput.value.trim() || App.project.metadata?.title || 'Sin título';
     }
     App.project.metadata.last_saved = new Date().toISOString();
+    App.project.metadata.app_version = APP_VERSION;
+    App.project.metadata.schema_version = SCHEMA_VERSION;
 
-    const currentWC = countWords(App.quill ? App.quill.getText() : '');
-    const now = new Date();
-    const startTime = App.session.start_time || now;
-    const durationMin = Math.max(1, Math.round((now.getTime() - startTime.getTime()) / 60000));
-    const todayISO = startTime.toISOString().split('T')[0];
-
-    // Asegurar estructura
     if (!App.project.telemetry) App.project.telemetry = { sessions: [], summary: {} };
     if (!Array.isArray(App.project.telemetry.sessions)) App.project.telemetry.sessions = [];
+    if (!App.session.id) startProjectSession();
 
-    // Si aún no hay ID de sesión, generar uno
-    if (!App.session.id) {
-      App.session.id = 'ses_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-      App.session.session_number = App.project.telemetry.sessions.length + 1;
+    // Línea de tiempo de crecimiento del documento (para el gráfico del docente)
+    const t = Math.round((Date.now() - (App.session.start_time || new Date()).getTime()) / 1000);
+    const docChars = App.quill ? App.quill.getLength() : 0;
+    const pastedChars = App.session.paste_events.reduce((a, e) => a + (e.chars_pasted || 0), 0);
+    const lastPt = App.session.timeline[App.session.timeline.length - 1];
+    if (!lastPt || lastPt[1] !== docChars || lastPt[3] !== pastedChars) {
+      App.session.timeline.push([t, docChars, App.session.process.chars_typed, pastedChars]);
     }
 
-    // Asegurar que chars_pasted de la sesión solo contabilice eventos NO iniciales
-    const nonInitialSessionChars = (App.session.paste_events || [])
-      .filter(ev => !ev.is_initial)
-      .reduce((sum, ev) => sum + (ev.chars_pasted || 0), 0);
-    App.session.chars_pasted = nonInitialSessionChars;
+    // Registro de la sesión activa (actualizar o agregar)
+    const rec = buildCurrentSessionRecord();
+    const sessions = App.project.telemetry.sessions;
+    const existingIndex = sessions.findIndex(s => s.session_id === rec.session_id);
+    if (existingIndex >= 0) sessions[existingIndex] = rec; else sessions.push(rec);
 
-    // Registro detallado de la sesión activa
-    const currentSessionRecord = {
-      session_id:         App.session.id,
-      session_number:     App.session.session_number,
-      date:               todayISO,
-      start_time:         startTime.toISOString(),
-      end_time:           now.toISOString(),
-      duration_minutes:   durationMin,
-      initial_word_count: App.session.initial_word_count || 0,
-      final_word_count:   currentWC,
-      words_net_change:   currentWC - (App.session.initial_word_count || 0),
-      words_typed:        App.session.words_typed,
-      chars_pasted:       nonInitialSessionChars,
-      paste_events:       [...App.session.paste_events],
-      keystroke_count:    App.session.keystroke_count,
-      biometrics: {
-        samples:          App.session.biometrics?.samples?.length || 0,
-        mean_dwell_ms:    App.project.biometrics?.session_metrics?.mean_dwell_ms || 0,
-        mean_flight_ms:   App.project.biometrics?.session_metrics?.mean_flight_ms || 0,
-        similarity_score: App.project.biometrics?.session_metrics?.similarity_score ?? (App.project.biometrics?.baseline ? 100 : null),
-        is_consistent:    (App.project.biometrics?.session_metrics?.similarity_score ?? 100) >= 65,
-      },
-    };
+    // Compatibilidad: métricas biométricas de la última sesión válida con teclado
+    const lastBio = [...sessions].reverse().find(s => s.biometrics && typeof s.biometrics.similarity_score === 'number');
+    App.project.biometrics.session_metrics = lastBio ? { ...lastBio.biometrics } : null;
+    App.project.biometrics.baseline = App.project.biometrics.baselines?.keyboard || null;
 
-    // Actualizar o agregar la sesión activa en el historial de sesiones
-    const existingIndex = App.project.telemetry.sessions.findIndex(s => s.session_id === App.session.id);
-    if (existingIndex >= 0) {
-      App.project.telemetry.sessions[existingIndex] = currentSessionRecord;
-    } else {
-      App.project.telemetry.sessions.push(currentSessionRecord);
-    }
-
-    // Consolidar resumen de todas las sesiones
-    const allSessions = App.project.telemetry.sessions;
-    const daysSet = new Set(allSessions.map(s => s.date).filter(Boolean));
-    const totalWordsTyped = allSessions.reduce((sum, s) => sum + (s.words_typed || 0), 0);
-
-    // Sumar ÚNICAMENTE caracteres de eventos no iniciales
-    const totalCharsPasted = allSessions.reduce((sum, s) => {
-      const sChars = (s.paste_events || [])
-        .filter(ev => !ev.is_initial)
-        .reduce((pSum, ev) => pSum + (ev.chars_pasted || 0), 0);
-      return sum + sChars;
-    }, 0);
-
-    let allPenalizedPasteWords = 0;
-    allSessions.forEach(s => {
-      (s.paste_events || []).forEach(ev => {
-        if (!ev.is_initial) allPenalizedPasteWords += (ev.approx_words || 0);
-      });
-    });
-
-    const totalCalculated = totalWordsTyped + allPenalizedPasteWords;
-    const manualRatio = totalCalculated > 0 ? (totalWordsTyped / totalCalculated) : 1;
-
+    // Resumen calculado con las MISMAS reglas que usa el panel docente
+    const m = EOTS.computeMetrics(App.project);
     App.project.telemetry.summary = {
-      total_sessions:          allSessions.length,
-      total_days_active:       daysSet.size,
-      total_words_typed:       totalWordsTyped,
-      total_chars_pasted:      totalCharsPasted,
-      manual_ratio:            Math.round(manualRatio * 100) / 100,
-      sources_with_screenshot: (App.project.sources || []).filter(s => s.screenshot_filename).length,
-      sources_cited_in_text:   (App.project.sources || []).filter(s => s.cited_in_text).length,
+      total_sessions:          m.total_sessions,
+      total_days_active:       m.total_days_active,
+      total_devices:           m.devices.length,
+      total_words_typed:       m.total_words_typed,
+      total_chars_pasted:      m.total_chars_pasted,
+      typed_share:             Math.round(m.typed_share * 1000) / 1000,
+      undeclared_share:        Math.round(m.undeclared_share * 1000) / 1000,
+      manual_ratio:            Math.round(m.typed_share * 100) / 100,
+      declared_pastes:         m.pastes.notes.n + m.pastes.quote.n + m.pastes.ai.n,
+      undeclared_pastes:       m.pastes.paste.n,
+      sources_with_screenshot: m.sources_with_screenshot,
+      sources_cited_in_text:   m.sources_cited_in_text,
+      captures:                m.captures_registered,
     };
 
-    // Crear objeto a serializar (sin imágenes base64 — solo rutas relativas)
+    // Registro del curso (Google Sheets): la sesión se encola y se envía en segundo plano
+    if (window.Cloud && Cloud.enabled) Cloud.enqueue(rec, m);
+
     const payload = safeClone(App.project);
-
-    // Agregar firma de integridad
+    delete payload.inline_screenshots; // sustituido por el registro de capturas
     payload._signature = await signPayload(payload);
+    App.lastPayload = payload;
 
-    // Persistir siempre en localStorage (para móviles y sesiones sin carpeta)
+    // Persistir siempre en el navegador (móviles y sesiones sin carpeta)
     try {
       localStorage.setItem('eots_active_project', JSON.stringify(payload));
       localStorage.setItem('eots_active_project_name', App.project.metadata.title || 'documento.json');
     } catch (storageErr) {
-      console.debug('Error guardando en localStorage:', storageErr);
+      if (!localStorageWarned) {
+        localStorageWarned = true;
+        showToast('El almacenamiento del navegador está lleno: descarga el paquete .zip con frecuencia.', 'warning');
+      }
     }
 
-    // Si hay carpeta de trabajo conectada (Chrome/Edge en PC), guardar físicamente en disco
     if (App.dirHandle) {
+      // Carpeta vinculada: se guarda en el MISMO .json que se abrió
       const json = JSON.stringify(payload, null, 2);
-      const fileHandle = await App.dirHandle.getFileHandle('documento.json', { create: true });
+      const fileHandle = await App.dirHandle.getFileHandle(App.jsonFileName || 'documento.json', { create: true });
       const writable   = await fileHandle.createWritable();
       await writable.write(json);
       await writable.close();
+    } else if (App.jsonFileHandle) {
+      if (/\.zip$/i.test(App.jsonFileHandle.name)) {
+        // Paquete .zip abierto en PC: se reescribe como máximo cada 60 s (incluye imágenes)
+        if (opts.force || !App.lastZipWrite || Date.now() - App.lastZipWrite > 60000) {
+          const { blob } = await buildBundleBlob(payload);
+          const writable = await App.jsonFileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          App.lastZipWrite = Date.now();
+        } else {
+          App.ui.isDirty = true; // quedará pendiente para el próximo guardado
+          updateSaveStatus('saved', App.project.metadata.last_saved);
+          return;
+        }
+      } else {
+        const writable = await App.jsonFileHandle.createWritable();
+        await writable.write(JSON.stringify(payload, null, 2));
+        await writable.close();
+      }
     }
 
     App.ui.isDirty = false;
@@ -1446,52 +2274,27 @@ async function saveProject() {
 }
 
 /* ================================================================
-   GUARDADO MANUAL CON MODAL DE ESTADÍSTICAS
+   GUARDADO MANUAL CON MODAL DE ESTADÍSTICAS (acumuladas del proyecto)
    ================================================================ */
 
 async function saveProjectWithStats() {
-  await saveProject();
+  await saveProject({ force: true });
 
-  // Poblar modal de estadísticas
-  const titleInput = document.getElementById('doc-title-input');
-  const docTitle = (titleInput && titleInput.value.trim()) || App.project.metadata?.title || 'Sin título';
+  const docTitle = App.project.metadata?.title || 'Sin título';
   const lastSaved = App.project.metadata?.last_saved;
+  const m = EOTS.computeMetrics(App.project);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-  const elTitle = document.getElementById('stats-doc-title');
-  const elSavedAt = document.getElementById('stats-doc-saved-at');
-  const elWords = document.getElementById('stats-word-count');
-  const elTyped = document.getElementById('stats-words-typed');
-  const elRatio = document.getElementById('stats-manual-ratio');
-  const elTime = document.getElementById('stats-session-time');
-  const elSources = document.getElementById('stats-sources-count');
-  const elPaste = document.getElementById('stats-paste-events');
-  const elSize = document.getElementById('stats-json-size');
-
-  if (elTitle) elTitle.textContent = docTitle;
-  if (elSavedAt && lastSaved) {
-    elSavedAt.textContent = `Guardado: ${new Date(lastSaved).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}`;
-  }
-
-  const currentWC = countWords(App.quill ? App.quill.getText() : '');
-  if (elWords) elWords.textContent = currentWC.toLocaleString('es');
-  if (elTyped) elTyped.textContent = App.session.words_typed.toLocaleString('es');
-
-  const penalizedWords = App.session.paste_events
-    .filter(ev => !ev.is_initial)
-    .reduce((sum, ev) => sum + (ev.approx_words || 0), 0);
-  const total = App.session.words_typed + penalizedWords;
-  const ratio = total > 0 ? Math.round((App.session.words_typed / total) * 100) : 100;
-  if (elRatio) elRatio.textContent = `${ratio}%`;
-
+  set('stats-doc-title', docTitle);
+  if (lastSaved) set('stats-doc-saved-at', `Guardado: ${new Date(lastSaved).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}`);
+  set('stats-word-count', m.word_count.toLocaleString('es'));
+  set('stats-words-typed', m.total_words_typed.toLocaleString('es'));
+  set('stats-manual-ratio', m.word_count ? EOTS.pct(m.typed_share) : '—');
   const sbTimer = document.getElementById('sb-session-time');
-  if (elTime && sbTimer) {
-    elTime.textContent = sbTimer.textContent.replace('Sesión: ', '');
-  }
+  if (sbTimer) set('stats-session-time', `${sbTimer.textContent.replace('Sesión: ', '')} · ${m.total_sessions} ses.`);
+  set('stats-sources-count', `${m.sources_with_screenshot}/${m.sources_count}`);
+  set('stats-paste-events', `${m.pastes.paste.n} / ${m.pastes.notes.n + m.pastes.quote.n + m.pastes.ai.n}`);
 
-  if (elSources) elSources.textContent = (App.project.sources || []).length;
-  if (elPaste) elPaste.textContent = App.session.paste_events.filter(ev => !ev.is_initial).length;
-
-  // Calcular tamaño del JSON en localStorage
   try {
     const stored = localStorage.getItem('eots_active_project') || '';
     const bytes = new Blob([stored]).size;
@@ -1499,13 +2302,54 @@ async function saveProjectWithStats() {
     if (bytes < 1024) sizeStr = `${bytes} B`;
     else if (bytes < 1024 * 1024) sizeStr = `${(bytes / 1024).toFixed(1)} KB`;
     else sizeStr = `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    if (elSize) elSize.textContent = sizeStr;
+    set('stats-json-size', `${sizeStr} + ${Object.keys(App.project.captures || {}).length} captura(s)`);
   } catch (e) {
-    if (elSize) elSize.textContent = '—';
+    set('stats-json-size', '—');
   }
 
   SoundFx.play('autosave_peace');
   openModal('modal-save-stats-overlay');
+}
+
+/* ================================================================
+   AUTOR DEL TRABAJO (nombre y correo para el reporte del docente)
+   ================================================================ */
+
+function syncAuthorInputs() {
+  const n = document.getElementById('author-name-input');
+  const e = document.getElementById('author-email-input');
+  if (n) n.value = App.project.metadata?.student_name || '';
+  if (e) e.value = App.project.metadata?.student_email || '';
+  // Con sesión iniciada los datos son los de la lista del docente (no editables aquí)
+  const locked = !!(window.Cloud && Cloud.isLoggedIn());
+  [n, e].forEach(el => { if (el) { el.readOnly = locked; el.title = locked ? 'Dato de la lista oficial del curso' : ''; } });
+}
+
+function promptAuthorIfMissing() {
+  // Con registro del curso, el nombre y el correo vienen de la lista oficial del docente
+  if (window.Cloud && Cloud.enabled) { if (Cloud.isLoggedIn()) Cloud.applyIdentity(); return; }
+  const md = App.project.metadata || {};
+  if (md.student_name && md.student_email) return;
+  const n = document.getElementById('modal-author-name');
+  const e = document.getElementById('modal-author-email');
+  if (n) n.value = md.student_name || '';
+  if (e) e.value = md.student_email || '';
+  setTimeout(() => openModal('modal-author-overlay'), 400);
+}
+
+function saveAuthorFromModal() {
+  const name = (document.getElementById('modal-author-name')?.value || '').trim();
+  const email = (document.getElementById('modal-author-email')?.value || '').trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('El correo no parece válido.', 'warning');
+    return;
+  }
+  App.project.metadata.student_name = name;
+  App.project.metadata.student_email = email;
+  syncAuthorInputs();
+  closeModal('modal-author-overlay');
+  App.ui.isDirty = true;
+  saveProject();
 }
 
 /* ================================================================
@@ -1599,23 +2443,27 @@ async function saveSource() {
     added_at:       new Date().toISOString(),
   };
 
-  // Si hay captura pendiente, copiarla a la carpeta capturas/
-  if (App.ui.pendingScreenshot && App.capturasHandle) {
-    const ext      = App.ui.pendingScreenshot.file.name.split('.').pop();
-    const filename = `captura_${source.id}.${ext}`;
+  // Al editar, no perder el estado "citado en texto", la fecha de alta, la clave BibTeX
+  // ni la captura existente
+  if (App.ui.editingSourceId) {
+    const prev = App.project.sources.find(s => s.id === App.ui.editingSourceId);
+    if (prev) {
+      source.cited_in_text = !!prev.cited_in_text;
+      source.quoted_in_text = !!prev.quoted_in_text;
+      source.added_at      = prev.added_at || source.added_at;
+      source.screenshot_filename = prev.screenshot_filename || null;
+      if (prev.bibtex_key) source.bibtex_key = prev.bibtex_key;
+    }
+  }
+
+  // Captura de evidencia: se guarda en el almacén portable (funciona también en celulares)
+  if (App.ui.pendingScreenshot) {
     try {
-      const fh  = await App.capturasHandle.getFileHandle(filename, { create: true });
-      const wr  = await fh.createWritable();
-      await wr.write(App.ui.pendingScreenshot.file);
-      await wr.close();
-      source.screenshot_filename = filename;
+      source.screenshot_filename = await registerCapture(App.ui.pendingScreenshot.file,
+        { source_id: source.id, caption: source.title });
     } catch (err) {
       showToast('No se pudo guardar la captura: ' + err.message, 'error');
     }
-  } else if (App.ui.editingSourceId) {
-    // Conservar captura existente si no se cambió
-    const existing = App.project.sources.find(s => s.id === App.ui.editingSourceId);
-    if (existing) source.screenshot_filename = existing.screenshot_filename;
   }
 
   // Agregar o reemplazar
@@ -1651,6 +2499,7 @@ function renderSourcesList() {
   if (countBadge) countBadge.textContent = App.project.sources.length;
 
   const container = document.getElementById('sources-list');
+  if (!container) return;
   if (App.project.sources.length === 0) {
     container.innerHTML = `<p class="text-sm text-muted" style="padding: 8px 4px;">
       Aún no hay fuentes registradas. Haz clic en <strong>+</strong> para agregar la primera.
@@ -1663,6 +2512,7 @@ function renderSourcesList() {
     const authorShort = src.authors && src.authors.length > 0
       ? (src.authors[0].split(',')[0] + (src.authors.length > 1 ? ' et al.' : ''))
       : 'Autor desconocido';
+    const sid = escapeHtml(src.id);
 
     const card = document.createElement('div');
     card.className = 'source-card fade-in';
@@ -1671,38 +2521,49 @@ function renderSourcesList() {
       <div class="source-card-title">${escapeHtml(src.title)}</div>
       <div class="source-card-meta">
         <span>${escapeHtml(authorShort)}</span>
-        <span>${src.year || '—'}</span>
+        <span>${escapeHtml(String(src.year || '—'))}</span>
         ${src.doi ? `<span title="${escapeHtml(src.doi)}">DOI ✓</span>` : ''}
       </div>
       <div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">
         <span class="source-card-badge">${typeLabel(src.type)}</span>
         ${src.screenshot_filename
-          ? `<span class="source-card-badge has-screenshot">📸 Captura</span>`
+          ? `<span class="source-card-badge has-screenshot" data-capture-badge="${escapeHtml(src.screenshot_filename)}">📸 Captura</span>`
           : `<span class="source-card-badge" style="background:var(--warning-light);color:var(--warning);">Sin captura</span>`}
         ${src.cited_in_text ? `<span class="source-card-badge">Citado en texto</span>` : ''}
+        ${src.quoted_in_text ? `<span class="source-card-badge">Cita textual</span>` : ''}
       </div>
       <div class="source-card-actions">
-        <button class="btn btn-sm btn-ghost" onclick="openAddSourceModal('${src.id}')">Editar</button>
-        <button class="btn btn-sm btn-ghost" onclick="insertCitationFromSource('${src.id}')">Citar</button>
-        <button class="btn btn-sm btn-ghost text-danger" onclick="deleteSource('${src.id}')">Eliminar</button>
-        ${src.screenshot_filename ? `<button class="btn btn-sm btn-ghost" onclick="viewScreenshot('${src.id}')">Ver captura</button>` : ''}
+        <button class="btn btn-sm btn-ghost" onclick="openAddSourceModal('${sid}')">Editar</button>
+        <button class="btn btn-sm btn-ghost" onclick="insertCitationFromSource('${sid}')">Citar</button>
+        <button class="btn btn-sm btn-ghost text-danger" onclick="deleteSource('${sid}')">Eliminar</button>
+        ${src.screenshot_filename ? `<button class="btn btn-sm btn-ghost" onclick="viewScreenshot('${sid}')">Ver captura</button>` : ''}
       </div>
     `;
     container.appendChild(card);
+  });
+
+  // Marcar las capturas que no están disponibles en este dispositivo
+  container.querySelectorAll('[data-capture-badge]').forEach(async badge => {
+    const filename = badge.getAttribute('data-capture-badge');
+    if (!(await CaptureStore.has(projectId(), filename)) && !(await getCaptureBlob(filename))) {
+      badge.textContent = '⚠ Captura no está en este dispositivo';
+      badge.style.background = 'var(--warning-light)';
+      badge.style.color = 'var(--warning)';
+      badge.style.cursor = 'pointer';
+      badge.title = 'Abre el paquete .zip del proyecto o haz clic para volver a adjuntar la imagen';
+      badge.onclick = () => relinkCaptureInteractive(filename);
+    }
   });
 }
 
 async function viewScreenshot(sourceId) {
   const src = App.project.sources.find(s => s.id === sourceId);
-  if (!src || !src.screenshot_filename || !App.capturasHandle) return;
-
-  try {
-    const fh   = await App.capturasHandle.getFileHandle(src.screenshot_filename);
-    const file = await fh.getFile();
-    const url  = URL.createObjectURL(file);
+  if (!src || !src.screenshot_filename) return;
+  const url = await getCaptureURL(src.screenshot_filename);
+  if (url) {
     window.open(url, '_blank');
-  } catch (err) {
-    showToast('No se encontró la captura en la carpeta del proyecto.', 'error');
+  } else if (confirm('Esta captura no está en este dispositivo. ¿Quieres volver a adjuntar la imagen ahora?')) {
+    relinkCaptureInteractive(src.screenshot_filename);
   }
 }
 
@@ -1744,53 +2605,53 @@ function normalizeAuthorName(a) {
   return { lastName: str, firstName: '', raw: str };
 }
 
+/** Apellidos para citas en el texto según el número de autores. */
+function inTextAuthors(authors, style) {
+  const last = authors.map(a => normalizeAuthorName(a).lastName);
+  if (last.length === 0) return 'Anónimo';
+  if (last.length === 1) return last[0];
+  if (last.length === 2) return style === 'apa' ? `${last[0]} & ${last[1]}` : `${last[0]} y ${last[1]}`;
+  if (style === 'chicago-author-date' && last.length === 3) return `${last[0]}, ${last[1]} y ${last[2]}`;
+  return `${last[0]} et al.`;
+}
+
+/**
+ * Cita en el texto (devuelve HTML con <em> para cursivas).
+ *  - chicago-note:        nota completa  → Apellido, Nombre, "Título," Revista (Año), pág.
+ *  - chicago-author-date: (Apellido Año, pág.)
+ *  - apa:                 (Apellido, Año, p. pág.)
+ *  - mla:                 (Apellido pág.)
+ */
 function formatCitation(src, pages, style) {
   const authors = src.authors || [];
   const year    = src.year || 's. f.';
-  const title   = src.title || '';
-  const journal = src.journal || '';
-  const pg      = pages ? (`, ${pages}`) : '';
+  const title   = escapeHtml(src.title || '');
+  const journal = escapeHtml(src.journal || '');
+  const pgs     = (pages || '').trim();
 
-  if (style === 'chicago-note' || style === 'chicago-author-date') {
-    // Chicago nota completa
-    const authorStr = authors.length > 0
-      ? authors.map((a, i) => {
-          const norm = normalizeAuthorName(a);
-          if (i === 0) {
-            return norm.firstName ? `${norm.lastName}, ${norm.firstName}` : norm.lastName;
-          }
-          return norm.firstName ? `${norm.firstName} ${norm.lastName}` : norm.lastName;
-        }).join(', ')
-      : 'Autor desconocido';
-    if (src.type === 'journal') {
-      return `${authorStr}, "${title}," <em>${journal}</em> (${year})${pg}.`;
-    }
-    return `${authorStr}, <em>${title}</em> (${year})${pg}.`;
+  if (style === 'chicago-author-date') {
+    return `(${escapeHtml(inTextAuthors(authors, style))} ${year}${pgs ? `, ${escapeHtml(pgs)}` : ''})`;
   }
-
   if (style === 'apa') {
-    let authorStr = 'Anónimo';
-    if (authors.length === 1) {
-      const n = normalizeAuthorName(authors[0]);
-      authorStr = n.lastName;
-    } else if (authors.length === 2) {
-      const n1 = normalizeAuthorName(authors[0]);
-      const n2 = normalizeAuthorName(authors[1]);
-      authorStr = `${n1.lastName} & ${n2.lastName}`;
-    } else if (authors.length > 2) {
-      const n1 = normalizeAuthorName(authors[0]);
-      authorStr = `${n1.lastName} et al.`;
-    }
-    return `(${authorStr}, ${year}${pg})`;
+    const p = pgs ? `, ${/[-–,]/.test(pgs) ? 'pp.' : 'p.'} ${escapeHtml(pgs)}` : '';
+    return `(${escapeHtml(inTextAuthors(authors, style))}, ${year}${p})`;
   }
-
   if (style === 'mla') {
-    const firstAuthor = authors[0] ? normalizeAuthorName(authors[0]).lastName : 'Anón.';
-    return `(${firstAuthor} ${pg.replace(', ','')})`.replace('  ', ' ');
+    return `(${escapeHtml(inTextAuthors(authors, style))}${pgs ? ` ${escapeHtml(pgs)}` : ''})`;
   }
-
-  const defaultAuthor = authors[0] ? normalizeAuthorName(authors[0]).lastName : 'Anón.';
-  return `(${defaultAuthor}, ${year}${pg})`;
+  // Chicago, nota completa (por defecto)
+  const authorStr = authors.length > 0
+    ? authors.map((a, i) => {
+        const n = normalizeAuthorName(a);
+        if (i === 0) return n.firstName ? `${n.firstName} ${n.lastName}` : n.lastName;
+        return n.firstName ? `${n.firstName} ${n.lastName}` : n.lastName;
+      }).join(', ')
+    : 'Autor desconocido';
+  const pg = pgs ? `, ${escapeHtml(pgs)}` : '';
+  if (src.type === 'journal') {
+    return `${escapeHtml(authorStr)}, "${title}," <em>${journal}</em> (${year})${pg}.`;
+  }
+  return `${escapeHtml(authorStr)}, <em>${title}</em> (${year})${pg}.`;
 }
 
 function reverseAuthorName(name) {
@@ -1845,9 +2706,30 @@ function insertCitationIntoEditor() {
   // Insertar en la posición actual del cursor de forma protegida ante pérdida de foco (ej. en iOS)
   const range = (App.quill && App.quill.getSelection()) || { index: Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1), length: 0 };
   const insertIndex = (range && typeof range.index === 'number') ? range.index : Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1);
-  App.quill.insertText(insertIndex, citation, 'user');
-  App.quill.formatText(insertIndex, citation.length, 'background', 'rgba(139, 92, 246, 0.20)');
-  App.quill.setSelection(insertIndex + citation.length);
+
+  // formatCitation devuelve HTML (<em>revista</em>). Antes se insertaba tal cual como
+  // texto plano y en el documento aparecían las etiquetas "<em>". Ahora se inserta
+  // por tramos, con cursiva real donde corresponde.
+  const segments = [];
+  citation.split(/(<em>.*?<\/em>)/g).forEach(part => {
+    if (!part) return;
+    const m = part.match(/^<em>(.*)<\/em>$/);
+    const txt = EOTS.htmlToText(m ? m[1] : part);
+    if (txt) segments.push({ text: txt, italic: !!m });
+  });
+
+  let cursor = insertIndex;
+  runAsSystemInsert(() => {
+    segments.forEach(seg => {
+      App.quill.insertText(cursor, seg.text,
+        { background: PROVENANCE_BG.citation, italic: seg.italic || false }, 'user');
+      cursor += seg.text.length;
+    });
+    // Un espacio limpio al final: el texto que se escriba después NO hereda el púrpura
+    App.quill.insertText(cursor, ' ', { background: false, italic: false }, 'user');
+    cursor += 1;
+  });
+  App.quill.setSelection(cursor, 0, 'silent');
 
   // Marcar fuente como citada
   src.cited_in_text = true;
@@ -1863,54 +2745,26 @@ function insertCitationIntoEditor() {
    ================================================================ */
 
 async function insertScreenshotAtCursor() {
-  // Crear un input temporal para seleccionar imagen (funciona tanto en PC con carpeta como en móviles)
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
-    await embedScreenshotInEditor(file);
-  };
-  input.click();
+  // Recordar la posición del cursor antes de abrir el selector de archivos
+  const range = App.quill ? App.quill.getSelection() : null;
+  const file = await pickImageFile();
+  if (!file) return;
+  await embedScreenshotInEditor(file, range);
 }
 
-async function embedScreenshotInEditor(file) {
+async function embedScreenshotInEditor(file, savedRange = null) {
   try {
-    const ext = ((file.name || 'captura.png').split('.').pop() || 'png').toLowerCase();
-    const filename = `captura_${Date.now()}.${ext}`;
-
-    // Si hay acceso a disco (PC con carpeta abierta), guardar físicamente en capturas/
-    if (App.capturasHandle) {
-      try {
-        const fh = await App.capturasHandle.getFileHandle(filename, { create: true });
-        const wr = await fh.createWritable();
-        await wr.write(file);
-        await wr.close();
-      } catch (fsErr) {
-        console.warn('No se pudo guardar archivo físico en capturas/:', fsErr);
-      }
-    }
-
-    // Insertar marcador en el editor en la posición del cursor de forma protegida
-    const range = (App.quill && App.quill.getSelection()) || { index: Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1) };
-    const insertIndex = (range && typeof range.index === 'number') ? range.index : Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1);
-    const placeholder = `[📸 Captura: ${filename}]`;
-    App.quill.insertText(insertIndex, placeholder, { bold: false, italic: true, color: '#4a6cf7' }, 'user');
-
-    // Guardar referencia persistente en el proyecto SIN blob_url efímero
-    if (!App.project.inline_screenshots) App.project.inline_screenshots = {};
-    App.project.inline_screenshots[placeholder] = {
-      filename,
-      inserted_at: new Date().toISOString(),
-      size: file.size || 0,
-      mime_type: file.type || 'image/png'
-    };
-
+    const caption = (prompt('Pie de la captura (opcional): por ejemplo, "Pérez 2020, p. 45"', '') || '').trim();
+    const filename = await registerCapture(file, { caption });
+    const fallbackIndex = Math.max(0, (App.quill ? App.quill.getLength() : 1) - 1);
+    const insertIndex = (savedRange && typeof savedRange.index === 'number') ? savedRange.index : fallbackIndex;
+    runAsSystemInsert(() => {
+      App.quill.insertEmbed(insertIndex, 'eots-capture', { filename, caption }, 'user');
+    });
+    App.quill.setSelection(insertIndex + 1, 0, 'silent');
     App.ui.isDirty = true;
     updateSaveStatus('unsaved');
-    showToast(`Captura "${filename}" incrustada en el texto.`, 'success');
-
+    showToast('📸 Captura insertada. Viaja con el proyecto dentro del paquete .zip.', 'success');
   } catch (err) {
     showToast('Error al insertar la captura: ' + err.message, 'error');
   }
@@ -1981,87 +2835,100 @@ async function exportToDocx() {
     showToast('Librería DOCX no disponible. Verifica tu conexión a internet.', 'error');
     return;
   }
-
   showToast('Generando documento Word…', 'info');
 
-  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = window.docx;
+  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType,
+          ImageRun, Table, TableRow, TableCell, WidthType } = window.docx;
 
   const title = App.project.metadata.title || 'Sin título';
   const delta = App.quill ? App.quill.getContents() : null;
-  const paragraphs = [];
+  const children = [];
+  const headings = [null, HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5];
+  const alignOf = a => a === 'center' ? AlignmentType.CENTER : a === 'right' ? AlignmentType.RIGHT : a === 'justify' ? AlignmentType.JUSTIFIED : AlignmentType.LEFT;
+  let hasBibliography = false;
 
-  if (delta && Array.isArray(delta.ops)) {
-    let currentRuns = [];
-    delta.ops.forEach(op => {
-      if (typeof op.insert === 'string') {
-        const parts = op.insert.split('\n');
-        for (let i = 0; i < parts.length; i++) {
-          if (parts[i].length > 0) {
-            currentRuns.push(new TextRun({
-              text: parts[i],
-              bold: !!op.attributes?.bold,
-              italics: !!op.attributes?.italic,
-              underline: !!op.attributes?.underline ? {} : undefined,
-            }));
-          }
-          if (i < parts.length - 1) {
-            let align = AlignmentType.LEFT;
-            if (op.attributes?.align === 'center') align = AlignmentType.CENTER;
-            else if (op.attributes?.align === 'right') align = AlignmentType.RIGHT;
-            else if (op.attributes?.align === 'justify') align = AlignmentType.JUSTIFIED;
+  let runs = [];
+  const flush = (attrs = {}) => {
+    const text = runs.map(r => r._t).join('');
+    if (attrs.header && /^(bibliograf|referencias|obras citadas)/i.test(text.trim())) hasBibliography = true;
+    children.push(new Paragraph({
+      children: runs.length ? runs.map(r => r.run) : [new TextRun('')],
+      alignment: alignOf(attrs.align),
+      heading: headings[attrs.header] || undefined,
+      spacing: { after: 180, line: 276 },
+    }));
+    runs = [];
+  };
 
-            let heading = undefined;
-            if (op.attributes?.header === 1) heading = HeadingLevel.HEADING_1;
-            else if (op.attributes?.header === 2) heading = HeadingLevel.HEADING_2;
-            else if (op.attributes?.header === 3) heading = HeadingLevel.HEADING_3;
-            else if (op.attributes?.header === 4) heading = HeadingLevel.HEADING_4;
-            else if (op.attributes?.header === 5) heading = HeadingLevel.HEADING_5;
-
-            paragraphs.push(new Paragraph({
-              children: currentRuns.length > 0 ? currentRuns : [new TextRun('')],
-              alignment: align,
-              heading: heading,
-              spacing: { after: 180, line: 276 }
-            }));
-            currentRuns = [];
-          }
+  for (const op of (delta?.ops || [])) {
+    if (typeof op.insert === 'string') {
+      const parts = op.insert.split('\n');
+      parts.forEach((part, i) => {
+        if (part.length > 0) {
+          const run = new TextRun({
+            text: part,
+            bold: !!op.attributes?.bold,
+            italics: !!op.attributes?.italic,
+            underline: op.attributes?.underline ? {} : undefined,
+          });
+          runs.push({ run, _t: part });
         }
+        if (i < parts.length - 1) flush(op.attributes || {});
+      });
+    } else if (op.insert && op.insert['eots-capture']) {
+      if (runs.length) flush();
+      const v = op.insert['eots-capture'];
+      const blob = await getCaptureBlob(v.filename);
+      const meta = App.project.captures?.[v.filename] || {};
+      if (blob && ImageRun) {
+        const w0 = meta.width || 800, h0 = meta.height || 600;
+        const scale = Math.min(1, 560 / w0);
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new ImageRun({ data: await blob.arrayBuffer(), transformation: { width: Math.round(w0 * scale), height: Math.round(h0 * scale) } })],
+        }));
       }
-    });
-    if (currentRuns.length > 0) {
-      paragraphs.push(new Paragraph({
-        children: currentRuns,
-        spacing: { after: 180, line: 276 }
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [new TextRun({ text: v.caption || (blob ? v.filename : `[Captura no disponible: ${v.filename}]`), italics: true, size: 18 })],
       }));
+    } else if (op.insert && op.insert['academic-table'] && Table) {
+      if (runs.length) flush();
+      const holder = document.createElement('div');
+      holder.innerHTML = op.insert['academic-table'].html || '';
+      const rows = Array.from(holder.querySelectorAll('tr')).map(tr => new TableRow({
+        children: Array.from(tr.children).map(cell => new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: cell.textContent || '', bold: cell.tagName === 'TH' })] })],
+        })),
+      }));
+      if (rows.length) children.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+      children.push(new Paragraph(''));
     }
-  } else {
-    const rawLines = (App.quill ? App.quill.getText() : '').split('\n').filter(l => l.trim());
-    rawLines.forEach(l => {
-      paragraphs.push(new Paragraph({ children: [new TextRun(l)], spacing: { after: 180 } }));
+  }
+  if (runs.length) flush();
+
+  // Bibliografía al final solo si el documento aún no la incluye
+  if (!hasBibliography && (App.project.sources || []).length) {
+    const style = projectCitationStyle();
+    const heading = style === 'apa' ? 'Referencias' : style === 'mla' ? 'Obras citadas' : 'Bibliografía';
+    children.push(new Paragraph({ text: heading, heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }));
+    App.project.sources.forEach(src => {
+      const html = formatBibliographyEntry(src, style);
+      const segs = html.split(/(<em>.*?<\/em>)/g).filter(Boolean).map(seg => {
+        const m = seg.match(/^<em>(.*)<\/em>$/);
+        return new TextRun({ text: EOTS.htmlToText(m ? m[1] : seg), italics: !!m });
+      });
+      children.push(new Paragraph({ children: segs, spacing: { after: 150 }, indent: { left: 720, hanging: 720 } }));
     });
   }
-
-  // Bibliografía al final
-  const bibParagraphs = [
-    new Paragraph({ text: 'Bibliografía', heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-  ];
-
-  App.project.sources.forEach(src => {
-    const citation = formatCitation(src, '', src.citation_style || 'chicago-note');
-    const cleanText = citation.replace(/<\/?em>/g, '').replace(/<[^>]+>/g, '');
-    bibParagraphs.push(new Paragraph({
-      children: [new TextRun(cleanText)],
-      spacing: { after: 150 },
-    }));
-  });
 
   const doc = new Document({
     sections: [{
       properties: {},
       children: [
         new Paragraph({ text: title, heading: HeadingLevel.TITLE, spacing: { after: 300 } }),
-        ...paragraphs,
-        ...bibParagraphs,
+        ...children,
       ],
     }],
   });
@@ -2072,7 +2939,6 @@ async function exportToDocx() {
   showToast('Documento Word exportado.', 'success');
 }
 
-// --- Bibliografía en formato RIS (para Zotero) ---
 function exportToRIS() {
   if (App.project.sources.length === 0) {
     showToast('No hay fuentes registradas para exportar.', 'warning');
@@ -2110,15 +2976,19 @@ function exportToRIS() {
 }
 
 // --- Copia de seguridad del JSON ---
+// --- Solo los datos (.json) — sin capturas ---
 async function exportJSON() {
-  await saveProject(); // guardar primero
-  const payload = safeClone(App.project);
-  payload._signature = await signPayload(payload);
+  await saveProject({ force: true });
+  const nCaps = Object.keys(App.project.captures || {}).length;
+  if (nCaps > 0 && !confirm(`El archivo .json NO incluye las ${nCaps} captura(s) del proyecto.\n\nPara cambiar de dispositivo o entregar al docente usa "Paquete del proyecto (.zip)".\n\n¿Descargar de todos modos solo el .json?`)) {
+    return;
+  }
+  const payload = App.lastPayload || safeClone(App.project);
   const blob  = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const title = App.project.metadata.title || 'documento';
   downloadBlob(blob, `${slugify(title)}_respaldo.json`, 'application/json');
   SoundFx.play('export_success');
-  showToast('Copia del proyecto descargada.', 'success');
+  showToast('Copia de datos (.json) descargada.', 'success');
 }
 
 /* ================================================================
@@ -2259,6 +3129,19 @@ function initEventListeners() {
 
   // Carga directa mediante input file nativo (onboard-file-input)
   const inputOnboardFile = document.getElementById('onboard-file-input');
+  if (inputOnboardFile && 'showOpenFilePicker' in window) {
+    // En PC: abrir con handle escribible para guardar de vuelta en el mismo archivo
+    inputOnboardFile.addEventListener('click', (e) => {
+      e.preventDefault();
+      openJsonWithWritableHandle().then((handled) => {
+        if (!handled) {
+          // Fallback al selector clásico
+          const alt = document.getElementById('input-load-json-direct');
+          if (alt) { alt.value = ''; alt.click(); }
+        }
+      });
+    });
+  }
   if (inputOnboardFile) {
     inputOnboardFile.addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
@@ -2295,7 +3178,7 @@ function initEventListeners() {
       e.preventDefault();
       if (modalBox) modalBox.style.borderColor = 'var(--border)';
       const files = e.dataTransfer?.files;
-      if (files && files[0] && files[0].name.endsWith('.json')) {
+      if (files && files[0] && /\.(json|zip)$/i.test(files[0].name)) {
         await loadProjectFromJSONFile(files[0]);
       }
     });
@@ -2394,6 +3277,7 @@ function initEventListeners() {
     const shouldOpen = (typeof forceOpen === 'boolean') ? forceOpen : !isCurrentlyOpen;
     App.ui.telePanelOpen = shouldOpen;
     sidebar.classList.toggle('collapsed', !shouldOpen);
+    if (shouldOpen) { updateTelemetryUI(); if (window.Cloud) Cloud.markStudentAlertsSeen(); }
     if (shouldOpen && window.innerWidth <= 900) {
       const src = document.getElementById('sidebar-sources');
       App.ui.sourcesPanelOpen = false;
@@ -2487,6 +3371,31 @@ function initEventListeners() {
   document.getElementById('export-docx').addEventListener('click', exportToDocx);
   document.getElementById('export-ris').addEventListener('click',  exportToRIS);
   document.getElementById('export-json').addEventListener('click', exportJSON);
+  const exportBundleBtn = document.getElementById('export-bundle');
+  if (exportBundleBtn) exportBundleBtn.addEventListener('click', exportBundle);
+
+  // Declaración de pegados
+  document.querySelectorAll('input[name="paste-kind"]').forEach(r => r.addEventListener('change', updatePasteDeclareForm));
+  const pdConfirm = document.getElementById('paste-declare-confirm');
+  if (pdConfirm) pdConfirm.addEventListener('click', () => resolvePasteDeclaration(true));
+  const pdSkip = document.getElementById('paste-declare-skip');
+  if (pdSkip) pdSkip.addEventListener('click', () => resolvePasteDeclaration(false));
+
+  // Autor del trabajo (nombre y correo para el reporte docente)
+  const authorName = document.getElementById('author-name-input');
+  const authorEmail = document.getElementById('author-email-input');
+  const onAuthor = () => {
+    App.project.metadata.student_name = (authorName?.value || '').trim();
+    App.project.metadata.student_email = (authorEmail?.value || '').trim();
+    App.ui.isDirty = true;
+    updateSaveStatus('unsaved');
+  };
+  if (authorName) authorName.addEventListener('input', onAuthor);
+  if (authorEmail) authorEmail.addEventListener('input', onAuthor);
+  const authorSave = document.getElementById('modal-author-save');
+  if (authorSave) authorSave.addEventListener('click', saveAuthorFromModal);
+  const authorLater = document.getElementById('modal-author-later');
+  if (authorLater) authorLater.addEventListener('click', () => closeModal('modal-author-overlay'));
 
   // Agregar fuente
   document.getElementById('btn-add-source').addEventListener('click', () => openAddSourceModal());
@@ -2619,7 +3528,8 @@ function initEventListeners() {
   // Cerrar modales con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay','modal-save-stats-overlay','modal-table-overlay'].forEach(id => closeModal(id));
+      ['modal-source-overlay','modal-citation-overlay','modal-biometrics-overlay','modal-save-stats-overlay','modal-table-overlay','modal-author-overlay'].forEach(id => closeModal(id));
+      if (document.getElementById('modal-paste-overlay')?.classList.contains('open')) resolvePasteDeclaration(false);
       closeMobileMenu();
     }
   });
@@ -2688,7 +3598,7 @@ function initEventListeners() {
   const btnStatsDownload = document.getElementById('btn-save-stats-download');
   if (btnStatsDownload) btnStatsDownload.addEventListener('click', async () => {
     closeModal('modal-save-stats-overlay');
-    await exportJSON();
+    await exportBundle();
   });
 
   // Inicializar menú hamburguesa y opciones móviles
@@ -2866,7 +3776,7 @@ function initMobileMenu() {
   if (mobSaveJson) {
     mobSaveJson.addEventListener('click', async () => {
       closeMobileMenu();
-      await exportJSON();
+      await exportBundle();
     });
   }
 
@@ -3225,7 +4135,7 @@ function insertTableAtCursor() {
 
   if (App.quill) {
     const range = App.quill.getSelection(true) || { index: App.quill.getLength(), length: 0 };
-    App.quill.insertEmbed(range.index, 'academic-table', { html: tableHtml }, 'user');
+    runAsSystemInsert(() => App.quill.insertEmbed(range.index, 'academic-table', { html: tableHtml }, 'user'));
     App.quill.setSelection(range.index + 1, 0, 'silent');
     closeTableModal();
     showToast(`✓ Tabla de ${rows}×${cols} insertada.`, 'success');
@@ -3322,7 +4232,15 @@ function handleTableActionClick(e) {
     }
   } else if (btn.classList.contains('btn-del-table')) {
     if (confirm('¿Eliminar esta tabla por completo?')) {
-      container.remove();
+      // Eliminar a través de Quill (antes se quitaba del DOM a sus espaldas y el
+      // modelo interno del editor quedaba desincronizado al guardar o deshacer)
+      const blot = Quill.find(container);
+      if (blot && App.quill) {
+        const index = App.quill.getIndex(blot);
+        runAsSystemInsert(() => App.quill.deleteText(index, 1, 'user'));
+      } else {
+        container.remove();
+      }
       App.ui.isDirty = true;
       updateSaveStatus('unsaved');
       showToast('Tabla eliminada.', 'info');
@@ -3505,7 +4423,7 @@ function insertTableOfContentsIntoDoc() {
 
   if (App.quill) {
     const range = App.quill.getSelection(true) || { index: 0, length: 0 };
-    App.quill.clipboard.dangerouslyPasteHTML(range.index, tocHtml, 'user');
+    runAsSystemInsert(() => App.quill.clipboard.dangerouslyPasteHTML(range.index, tocHtml, 'user'));
     showToast(`📋 Índice general insertado con ${headings.length} secciones.`, 'success');
     App.ui.isDirty = true;
     updateSaveStatus('unsaved');
@@ -3513,6 +4431,17 @@ function insertTableOfContentsIntoDoc() {
 }
 
 // ---- Bibliografía Insertable ----
+/** Estilo de la bibliografía: el elegido para el proyecto o el más usado en las fuentes. */
+function projectCitationStyle() {
+  if (App.project.metadata.citation_style) return App.project.metadata.citation_style;
+  const counts = {};
+  (App.project.sources || []).forEach(s => {
+    const st = s.citation_style || 'chicago-note';
+    counts[st] = (counts[st] || 0) + 1;
+  });
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'chicago-note';
+}
+
 function insertBibliographyIntoDoc() {
   const sources = App.project.sources || [];
   if (sources.length === 0) {
@@ -3520,26 +4449,27 @@ function insertBibliographyIntoDoc() {
     return;
   }
 
-  // Ordenar alfabéticamente por apellido del primer autor o título
+  // Orden alfabético por apellido del primer autor (o por título)
   const sorted = [...sources].sort((a, b) => {
-    const authorA = (a.authors && a.authors[0]) ? a.authors[0].toLowerCase() : (a.title || '').toLowerCase();
-    const authorB = (b.authors && b.authors[0]) ? b.authors[0].toLowerCase() : (b.title || '').toLowerCase();
-    return authorA.localeCompare(authorB);
+    const ka = a.authors?.[0] ? normalizeAuthorName(a.authors[0]).lastName : (a.title || '');
+    const kb = b.authors?.[0] ? normalizeAuthorName(b.authors[0]).lastName : (b.title || '');
+    return ka.localeCompare(kb, 'es', { sensitivity: 'base' });
   });
 
-  const style = App.project.metadata.citation_style || 'chicago-note';
+  const style = projectCitationStyle();
+  const heading = style === 'apa' ? 'Referencias' : style === 'mla' ? 'Obras citadas' : 'Bibliografía';
 
-  let bibHtml = `<div class="doc-bib-block"><h2>Bibliografía</h2>`;
+  let bibHtml = `<h2>${heading}</h2>`;
   sorted.forEach(src => {
-    const entryText = formatBibliographyEntry(src, style);
-    bibHtml += `<p class="bibliography-entry">${entryText}</p>`;
+    bibHtml += `<p class="bibliography-entry">${formatBibliographyEntry(src, style)}</p>`;
   });
-  bibHtml += `</div><p><br></p>`;
+  bibHtml += `<p><br></p>`;
 
   if (App.quill) {
     const length = App.quill.getLength();
-    App.quill.clipboard.dangerouslyPasteHTML(length, bibHtml, 'user');
-    showToast(`📚 Bibliografía con ${sorted.length} fuentes insertada al final del documento.`, 'success');
+    runAsSystemInsert(() => App.quill.clipboard.dangerouslyPasteHTML(length, bibHtml, 'user'));
+    const label = { 'chicago-note': 'Chicago', 'chicago-author-date': 'Chicago autor-fecha', apa: 'APA 7', mla: 'MLA 9' }[style] || style;
+    showToast(`📚 ${heading} (${label}) con ${sorted.length} fuentes insertada al final del documento.`, 'success');
     App.ui.isDirty = true;
     updateSaveStatus('unsaved');
   }
@@ -3548,33 +4478,49 @@ function insertBibliographyIntoDoc() {
 function formatBibliographyEntry(src, style) {
   const authors = src.authors || [];
   const year    = src.year || 's. f.';
-  const title   = src.title || 'Sin título';
-  const journal = src.journal || '';
-  const doi     = src.doi ? ` https://doi.org/${src.doi.replace(/^https?:\/\/doi\.org\//, '')}` : '';
+  const title   = escapeHtml(src.title || 'Sin título');
+  const journal = escapeHtml(src.journal || '');
+  const pages   = escapeHtml((src.pages || '').replace(/--/g, '–'));
+  const doiRaw  = (src.doi || '').replace(/^https?:\/\/(dx\.)?doi\.org\//, '');
+  const doi     = doiRaw ? (/^https?:/.test(doiRaw) ? ` ${escapeHtml(doiRaw)}` : ` https://doi.org/${escapeHtml(doiRaw)}`) : '';
+  const names   = authors.map(normalizeAuthorName);
+  const isJournal = src.type === 'journal';
 
   if (style === 'apa') {
-    const authorStr = authors.length > 0 ? authors.join(', ') : 'Autor desconocido';
-    if (src.type === 'journal') {
-      return `${authorStr} (${year}). ${title}. <em>${journal}</em>.${doi}`;
-    }
-    return `${authorStr} (${year}). <em>${title}</em>.${doi}`;
+    // Apellido, I. I., Apellido, I., & Apellido, I. (Año). Título. Revista, pp. DOI
+    const initials = n => n.firstName ? n.firstName.split(/[\s-]+/).filter(Boolean).map(w => w[0].toUpperCase() + '.').join(' ') : '';
+    const list = names.map(n => initials(n) ? `${n.lastName}, ${initials(n)}` : n.lastName);
+    const authorStr = list.length === 0 ? title
+      : list.length === 1 ? list[0]
+      : list.slice(0, -1).join(', ') + ', & ' + list[list.length - 1];
+    if (isJournal) return `${escapeHtml(authorStr)} (${year}). ${title}. <em>${journal}</em>${pages ? `, ${pages}` : ''}.${doi}`;
+    return `${escapeHtml(authorStr)} (${year}). <em>${title}</em>.${doi}`;
   }
 
-  // Chicago nota completa / bibliografía
-  const authorStr = authors.length > 0
-    ? authors.map((a, i) => {
-        const norm = normalizeAuthorName(a);
-        if (i === 0) {
-          return norm.firstName ? `${norm.lastName}, ${norm.firstName}` : norm.lastName;
-        }
-        return norm.firstName ? `${norm.firstName} ${norm.lastName}` : norm.lastName;
-      }).join(', ')
-    : 'Autor desconocido';
+  // Primer autor invertido, resto en orden natural (Chicago y MLA)
+  const invFirst = names.map((n, i) => i === 0
+    ? (n.firstName ? `${n.lastName}, ${n.firstName}` : n.lastName)
+    : (n.firstName ? `${n.firstName} ${n.lastName}` : n.lastName));
+  const joinAuthors = (arr) => arr.length <= 1 ? (arr[0] || '')
+    : arr.length === 2 ? `${arr[0]} y ${arr[1]}`
+    : `${arr.slice(0, -1).join(', ')} y ${arr[arr.length - 1]}`;
 
-  if (src.type === 'journal') {
-    return `${authorStr}. "${title}." <em>${journal}</em> (${year}).${doi}`;
+  if (style === 'mla') {
+    // Apellido, Nombre, et al. "Título." Revista, Año, pp. DOI.
+    const authorStr = names.length === 0 ? '' : names.length > 2 ? `${invFirst[0]}, et al` : joinAuthors(invFirst);
+    if (isJournal) return `${escapeHtml(authorStr)}. "${title}." <em>${journal}</em>, ${year}${pages ? `, pp. ${pages}` : ''}.${doi}`;
+    return `${escapeHtml(authorStr)}. <em>${title}</em>. ${year}.${doi}`;
   }
-  return `${authorStr}. <em>${title}</em> (${year}).${doi}`;
+
+  const authorStr = names.length ? joinAuthors(invFirst) : 'Autor desconocido';
+  if (style === 'chicago-author-date') {
+    // Apellido, Nombre. Año. "Título." Revista pp. DOI.
+    if (isJournal) return `${escapeHtml(authorStr)}. ${year}. "${title}." <em>${journal}</em>${pages ? `: ${pages}` : ''}.${doi}`;
+    return `${escapeHtml(authorStr)}. ${year}. <em>${title}</em>.${doi}`;
+  }
+  // Chicago notas y bibliografía: Apellido, Nombre. "Título." Revista (Año): pp. DOI.
+  if (isJournal) return `${escapeHtml(authorStr)}. "${title}." <em>${journal}</em> (${year})${pages ? `: ${pages}` : ''}.${doi}`;
+  return `${escapeHtml(authorStr)}. <em>${title}</em>. ${year}.${doi}`;
 }
 
 // ---- División de Página Visible, Statusbar y Scroll Tooltip ----
@@ -3711,3 +4657,7 @@ function updateCursorPosition() {
 window.updateCursorPosition = updateCursorPosition;
 
 
+
+// Funciones usadas desde atributos onclick del HTML
+window.relinkCaptureInteractive = relinkCaptureInteractive;
+window.viewScreenshot = viewScreenshot;
