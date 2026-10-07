@@ -5,7 +5,7 @@
  * se recarga o se pierde la conexión a internet.
  */
 
-const CACHE_NAME = 'eots-offline-v3.0';
+const CACHE_NAME = 'eots-offline-v3.3';
 
 const STATIC_ASSETS = [
   './',
@@ -36,12 +36,15 @@ const STATIC_ASSETS = [
   'config.js',
   'cloud.js',
   'cloud.js?v=3.0',
+  'cloud.js?v=3.3',
+  'config.js?v=3.3',
   'config.js?v=3.0',
   'analytics.js?v=3.0',
   'editor.js?v=3.0',
   'styles.css?v=3.0',
   'captures.js?v=3.0',
   'dashboard.js?v=3.0',
+  'dashboard.js?v=3.3',
   'analytics.js',
   'analytics.js?v=2.0',
   'captures.js',
@@ -153,8 +156,11 @@ self.addEventListener('fetch', (event) => {
     (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'));
 
   if (isSameOriginCode) {
+    // config.js nunca se guarda: siempre la versión vigente del servidor (la URL del curso
+    // puede cambiar). El resto se revalida con el servidor saltándose la caché HTTP.
+    const isConfig = url.pathname.endsWith('/config.js');
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: isConfig ? 'no-store' : 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.ok) {
             const clone = networkResponse.clone();

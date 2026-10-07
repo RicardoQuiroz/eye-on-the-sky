@@ -39,16 +39,45 @@
     teacherAlerts: null,
 
     /* ---------------- Red ---------------- */
+    /** Últimos caracteres del ID de la implementación (para comparar con la del docente). */
+    serverTag() {
+      const m = URL_.match(/\/s\/([^/]+)\/(exec|dev)/);
+      return m ? '…' + m[1].slice(-6) + '/' + m[2] : URL_;
+    },
+
     async post(body) {
-      // text/plain evita la "verificación previa" (CORS) que Apps Script no responde
-      const res = await fetch(URL_, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(body),
-        redirect: 'follow',
-      });
-      if (!res.ok) throw new Error('El servidor respondió ' + res.status);
-      return res.json();
+      const payload = JSON.stringify(body);
+      let firstError = null;
+      try {
+        // text/plain evita la "verificación previa" (CORS) que Apps Script no responde.
+        // credentials:'omit' evita que las cuentas de Google abiertas en el navegador
+        // desvíen la petición (causa habitual de 404 en tabletas y celulares).
+        const res = await fetch(URL_, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: payload,
+          redirect: 'follow',
+          credentials: 'omit',
+          cache: 'no-store',
+        });
+        if (res.ok) return await res.json();
+        firstError = new Error('El servidor respondió ' + res.status);
+      } catch (e) {
+        firstError = e;
+      }
+      // Segundo intento por GET (?payload=) para peticiones pequeñas que no llevan
+      // contraseña (estado, panel docente). La contraseña nunca viaja en la URL.
+      if (payload.length < 6000 && body.action !== 'login') {
+        try {
+          const res = await fetch(URL_ + (URL_.includes('?') ? '&' : '?') + 'payload=' + encodeURIComponent(payload), {
+            method: 'GET', redirect: 'follow', credentials: 'omit', cache: 'no-store',
+          });
+          if (res.ok) return await res.json();
+          firstError = new Error('El servidor respondió ' + res.status);
+        } catch (e) { /* conservar el primer error */ }
+      }
+      const msg = (firstError && firstError.message) || 'Error de red';
+      throw new Error(msg + ' (servidor ' + this.serverTag() + ')');
     },
 
     /* ---------------- Sesión del estudiante ---------------- */

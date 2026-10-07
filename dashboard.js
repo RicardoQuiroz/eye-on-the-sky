@@ -855,8 +855,11 @@ const Live = {
     showModal(document.getElementById('modal-live'));
   },
   async post(body) {
-    const res = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
-    if (!res.ok) throw new Error('El servidor respondió ' + res.status);
+    const res = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow', credentials: 'omit', cache: 'no-store' });
+    if (!res.ok) {
+      const m = this.url.match(/\/s\/([^/]+)\//);
+      throw new Error('El servidor respondió ' + res.status + (m ? ' (servidor …' + m[1].slice(-6) + ')' : ''));
+    }
     return res.json();
   },
   async connectFromModal() {
