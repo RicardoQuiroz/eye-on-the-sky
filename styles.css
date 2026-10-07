@@ -2135,3 +2135,24 @@ body {
 #upload-zone.compact { padding: 14px 20px; }
 #upload-zone.compact svg, #upload-zone.compact p:last-child { display: none; }
 #upload-zone.compact h2 { font-size: 0.9rem; margin: 0; }
+
+/* v3.2 — El panel "Actividad y Salud" creció: debe poder desplazarse (rueda del ratón,
+   barra de desplazamiento y gesto táctil), con la cabecera fija arriba. */
+#sidebar-telemetry {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+#sidebar-telemetry:not(.collapsed) { width: 280px; }
+#sidebar-telemetry > .sidebar-header {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+#sidebar-telemetry .sidebar-title { font-size: 1.05rem; line-height: 1.25; }
+#sidebar-telemetry > .tele-section { flex-shrink: 0; }
+@media (max-width: 900px) {
+  #sidebar-telemetry:not(.collapsed) { width: 300px; max-width: 88vw; }
+}
