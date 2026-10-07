@@ -1129,6 +1129,8 @@
         <input class="form-input" id="login-password" type="password" autocomplete="current-password" />
       </div>
       <p class="text-sm" id="login-error" style="color: var(--danger); min-height: 1.2em;"></p>
+      <button type="button" class="btn btn-sm" id="login-diagnose" style="display:none; margin-top:4px;">🩺 Probar conexión con el servidor</button>
+      <pre id="login-diagnose-out" style="display:none; white-space:pre-wrap; font-size:0.72rem; background:var(--bg-secondary, #f4f4f6); padding:8px; border-radius:6px; margin-top:6px; max-height:220px; overflow:auto; user-select:all;"></pre>
     </div>
     <div class="modal-footer">
       <button class="btn" id="login-skip">Trabajar sin conexión por ahora</button>
@@ -1181,7 +1183,7 @@
 <!-- Lógica principal -->
 <script src="editor.js?v=3.0"></script>
 <!-- Registro del curso en Google Sheets (solo si config.js tiene WEB_APP_URL) -->
-<script src="cloud.js?v=3.3"></script>
+<script src="cloud.js?v=3.4"></script>
 
 <!-- Verificación de instalación: avisa si falta algún archivo del sitio publicado -->
 <script>

@@ -45,46 +45,57 @@
       return m ? '…' + m[1].slice(-6) + '/' + m[2] : URL_;
     },
 
-    async post(body) {
+    /**
+     * Envía una petición al Apps Script. Google a veces responde con una página de error
+     * pasajera («No se pudo abrir el archivo en este momento», 404/5xx) aunque el servidor
+     * esté bien; por eso se reintenta hasta 3 veces por POST con esperas crecientes y, si la
+     * petición no lleva contraseña, una vez más por GET. Todas las acciones son repetibles
+     * sin efectos dobles (las sesiones se guardan por su ID).
+     */
+    async post(body, opts = {}) {
       const payload = JSON.stringify(body);
-      let firstError = null;
-      try {
-        // text/plain evita la "verificación previa" (CORS) que Apps Script no responde.
-        // credentials:'omit' evita que las cuentas de Google abiertas en el navegador
-        // desvíen la petición (causa habitual de 404 en tabletas y celulares).
-        const res = await fetch(URL_, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: payload,
-          redirect: 'follow',
-          credentials: 'omit',
-          cache: 'no-store',
-        });
-        if (res.ok) return await res.json();
-        firstError = new Error('El servidor respondió ' + res.status);
-      } catch (e) {
-        firstError = e;
-      }
-      // Segundo intento por GET (?payload=) para peticiones pequeñas que no llevan
-      // contraseña (estado, panel docente). La contraseña nunca viaja en la URL.
-      if (payload.length < 6000 && body.action !== 'login') {
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      const asJson = async (res) => {
+        if (!res.ok) {
+          let host = ''; try { host = new URL(res.url).host; } catch (_) {}
+          throw new Error('El servidor respondió ' + res.status + (host && host !== 'script.google.com' ? ' en ' + host : ''));
+        }
+        const txt = await res.text();
+        try { return JSON.parse(txt); } catch (_) { throw new Error('El servidor devolvió una página de error de Google'); }
+      };
+      const delays = [0, 1500, 4000];
+      let lastError = null;
+      for (let i = 0; i < delays.length; i++) {
+        if (delays[i]) { if (opts.onRetry) opts.onRetry(i); await wait(delays[i]); }
         try {
-          const res = await fetch(URL_ + (URL_.includes('?') ? '&' : '?') + 'payload=' + encodeURIComponent(payload), {
-            method: 'GET', redirect: 'follow', credentials: 'omit', cache: 'no-store',
-          });
-          if (res.ok) return await res.json();
-          firstError = new Error('El servidor respondió ' + res.status);
-        } catch (e) { /* conservar el primer error */ }
+          // text/plain evita la "verificación previa" (CORS) que Apps Script no responde.
+          return await asJson(await fetch(URL_, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: payload, redirect: 'follow', credentials: 'omit', cache: 'no-store',
+          }));
+        } catch (e) {
+          lastError = e;
+          if (!navigator.onLine) break;
+        }
       }
-      const msg = (firstError && firstError.message) || 'Error de red';
-      throw new Error(msg + ' (servidor ' + this.serverTag() + ')');
+      // Último intento por GET (?payload=) para peticiones pequeñas SIN contraseña.
+      if (navigator.onLine && payload.length < 6000 && body.action !== 'login') {
+        try {
+          return await asJson(await fetch(URL_ + (URL_.includes('?') ? '&' : '?') + 'payload=' + encodeURIComponent(payload), {
+            method: 'GET', redirect: 'follow', credentials: 'omit', cache: 'no-store',
+          }));
+        } catch (e) { /* conservar el error anterior */ }
+      }
+      const msg = (lastError && lastError.message) || 'Error de red';
+      throw new Error(msg + ' (servidor ' + this.serverTag() + '). Inténtalo de nuevo en un minuto.');
     },
 
     /* ---------------- Sesión del estudiante ---------------- */
     isLoggedIn() { return !!(this.auth && this.auth.token); },
 
     async login(carnet, password) {
-      const r = await this.post({ action: 'login', carnet, password });
+      const r = await this.post({ action: 'login', carnet, password }, { onRetry: n => { const b = document.getElementById('login-submit'); if (b) b.textContent = 'Reintentando (' + (n + 1) + '/3)…'; } });
       if (!r.ok) throw new Error(r.error || 'No se pudo iniciar sesión.');
       this.auth = { carnet: r.carnet, token: r.token, nombre: r.nombre, correo: r.correo };
       jset(LS.auth, this.auth);
@@ -268,6 +279,33 @@
       this.refreshTeacher();
     },
 
+    /** Prueba la conexión paso a paso y devuelve un informe para enviar al docente. */
+    async diagnose() {
+      const lines = [
+        'Eye on the Sky · diagnóstico ' + new Date().toISOString(),
+        'Servidor: ' + this.serverTag(),
+        'Navegador: ' + navigator.userAgent,
+        'En línea: ' + navigator.onLine + ' · Service worker: ' + !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+      ];
+      const probe = async (label, url, opts) => {
+        const t0 = Date.now();
+        try {
+          const res = await fetch(url, Object.assign({ redirect: 'follow', credentials: 'omit', cache: 'no-store' }, opts));
+          let host = '?'; try { host = new URL(res.url).host + new URL(res.url).pathname.slice(0, 18); } catch (_) {}
+          const txt = (await res.text()).replace(/\s+/g, ' ').slice(0, 90);
+          lines.push(`${label}: ${res.status} · ${Date.now() - t0} ms · redirigido=${res.redirected} · final=${host} · «${txt}»`);
+        } catch (e) {
+          lines.push(`${label}: ERROR ${e.name}: ${e.message} · ${Date.now() - t0} ms`);
+        }
+      };
+      const post = b => ({ method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(b) });
+      await probe('1 GET simple', URL_, { method: 'GET' });
+      await probe('2 POST ping', URL_, post({ action: 'ping' }));
+      await probe('3 GET ping', URL_ + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'ping' })), { method: 'GET' });
+      await probe('4 POST login de prueba', URL_, post({ action: 'login', carnet: '0', password: 'x' }));
+      return lines.join('\n');
+    },
+
     /* ---------------- Interfaz ---------------- */
     showLogin() {
       if (!this.enabled) return;
@@ -291,6 +329,8 @@
         showToast(`✓ Hola, ${r.nombre}. Tus sesiones de trabajo quedarán registradas para el curso.`, 'success');
       } catch (e) {
         if (err) err.textContent = navigator.onLine ? e.message : 'Sin conexión a internet. Puedes trabajar y se registrará al volver la conexión.';
+        const d = document.getElementById('login-diagnose');
+        if (d && /servidor|fetch|red|network|json/i.test(e.message)) d.style.display = '';
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Iniciar sesión'; }
       }
@@ -333,6 +373,13 @@
     init() {
       if (!this.enabled) { this.render(); return; }
       document.getElementById('login-submit')?.addEventListener('click', () => this.submitLogin());
+      document.getElementById('login-diagnose')?.addEventListener('click', async (ev) => {
+        const out = document.getElementById('login-diagnose-out');
+        ev.target.disabled = true; out.style.display = ''; out.textContent = 'Probando…';
+        out.textContent = await this.diagnose();
+        ev.target.disabled = false;
+        try { await navigator.clipboard.writeText(out.textContent); showToast('Informe copiado: pégalo en un mensaje para tu docente.', 'success'); } catch (_) {}
+      });
       document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') this.submitLogin(); });
       document.getElementById('login-skip')?.addEventListener('click', () => {
         closeModal('modal-login-overlay');

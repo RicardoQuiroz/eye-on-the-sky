@@ -855,12 +855,19 @@ const Live = {
     showModal(document.getElementById('modal-live'));
   },
   async post(body) {
-    const res = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow', credentials: 'omit', cache: 'no-store' });
-    if (!res.ok) {
-      const m = this.url.match(/\/s\/([^/]+)\//);
-      throw new Error('El servidor respondió ' + res.status + (m ? ' (servidor …' + m[1].slice(-6) + ')' : ''));
+    // Google a veces devuelve una página de error pasajera (404/5xx): reintentar.
+    let last = null;
+    for (const d of [0, 1500, 4000]) {
+      if (d) await new Promise(r => setTimeout(r, d));
+      try {
+        const res = await fetch(this.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow', credentials: 'omit', cache: 'no-store' });
+        if (!res.ok) throw new Error('El servidor respondió ' + res.status);
+        const txt = await res.text();
+        try { return JSON.parse(txt); } catch (_) { throw new Error('El servidor devolvió una página de error de Google'); }
+      } catch (e) { last = e; if (!navigator.onLine) break; }
     }
-    return res.json();
+    const m = this.url.match(/\/s\/([^/]+)\//);
+    throw new Error(last.message + (m ? ' (servidor …' + m[1].slice(-6) + ')' : '') + '. Inténtalo de nuevo en un minuto.');
   },
   async connectFromModal() {
     const url = document.getElementById('live-url').value.trim();

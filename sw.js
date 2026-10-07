@@ -5,7 +5,7 @@
  * se recarga o se pierde la conexión a internet.
  */
 
-const CACHE_NAME = 'eots-offline-v3.3';
+const CACHE_NAME = 'eots-offline-v3.4';
 
 const STATIC_ASSETS = [
   './',
@@ -37,6 +37,7 @@ const STATIC_ASSETS = [
   'cloud.js',
   'cloud.js?v=3.0',
   'cloud.js?v=3.3',
+  'cloud.js?v=3.4',
   'config.js?v=3.3',
   'config.js?v=3.0',
   'analytics.js?v=3.0',
@@ -45,6 +46,7 @@ const STATIC_ASSETS = [
   'captures.js?v=3.0',
   'dashboard.js?v=3.0',
   'dashboard.js?v=3.3',
+  'dashboard.js?v=3.4',
   'analytics.js',
   'analytics.js?v=2.0',
   'captures.js',
