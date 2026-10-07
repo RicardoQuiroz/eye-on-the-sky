@@ -323,7 +323,23 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="config.js?v=3.0"></script>
 <script src="analytics.js?v=3.0"></script>
-<script src="dashboard.js?v=3.1"></script>
+<script src="dashboard.js?v=3.2"></script>
+<!-- Verificación de instalación: avisa si falta algún archivo del sitio publicado -->
+<script>
+  window.addEventListener('DOMContentLoaded', function () {
+    var faltan = [];
+    if (!window.EOTS) faltan.push('analytics.js');
+    if (!window.EOTS_CONFIG) faltan.push('config.js');
+    
+    if (faltan.length) {
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;padding:12px 16px;background:#b91c1c;color:#fff;font:600 14px/1.4 Arial,sans-serif;text-align:center;';
+      d.textContent = '⚠ Instalación incompleta: no se encontró ' + faltan.join(', ') + ' en el sitio publicado. Súbelo(s) a la misma carpeta que este archivo y recarga la página.';
+      document.body.appendChild(d);
+    }
+  });
+</script>
+
 <!-- Registro de Service Worker para soporte Offline / PWA -->
 <script>
   if ('serviceWorker' in navigator) {

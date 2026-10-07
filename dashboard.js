@@ -864,11 +864,17 @@ const Live = {
     const key = document.getElementById('live-key').value.trim();
     const err = document.getElementById('live-error');
     if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { err.textContent = 'La URL debe ser la de tu aplicación web de Apps Script (…/exec).'; return; }
+    if (/\/dev\/?$/.test(url)) { err.textContent = 'Esa es la URL de PRUEBA (/dev), que solo funciona dentro de tu sesión de Google. Usa la de Implementar › Gestionar implementaciones (termina en /exec).'; return; }
     this.url = url; this.key = key;
     try {
       const r = await this.post({ action: 'docente_resumen', teacher_key: key, solo_alertas: true });
       if (!r.ok) { err.textContent = r.error || 'No se pudo conectar.'; return; }
-    } catch (e) { err.textContent = 'No se pudo conectar: ' + e.message; return; }
+    } catch (e) {
+      const cfg = (window.EOTS_CONFIG && EOTS_CONFIG.WEB_APP_URL) || '';
+      err.textContent = 'No se pudo conectar (' + e.message + '). Verifica que la URL sea la de Implementar › Gestionar implementaciones, con acceso "Cualquier usuario".' +
+        (cfg && cfg !== url ? ' Esta URL es distinta a la de config.js: prueba con esa.' : '');
+      return;
+    }
     try { localStorage.setItem('eots-live-url', url); localStorage.setItem('eots-teacher-key', key); } catch (_) {}
     hideModal(document.getElementById('modal-live'));
     showToast('✓ Conectado al registro del curso.', 'success');
