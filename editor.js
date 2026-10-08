@@ -2824,9 +2824,70 @@ async function fetchDOI() {
    ================================================================ */
 
 // --- PDF (usa el CSS de impresión definido en styles.css) ---
+// La interfaz del editor ocupa exactamente la pantalla (alto fijo con desplazamiento
+// interno), así que imprimirla tal cual produce UNA sola página. Para el PDF se arma una
+// copia limpia del documento en #print-root, que fluye libremente en todas las páginas.
+function buildPrintRoot() {
+  document.getElementById('print-root')?.remove();
+  const root = document.createElement('div');
+  root.id = 'print-root';
+  const title = App.project.metadata.title || 'Sin título';
+  const h = document.createElement('h1');
+  h.className = 'print-title';
+  h.textContent = title;
+  root.appendChild(h);
+
+  const body = document.createElement('div');
+  body.className = 'ql-editor print-body';
+  body.innerHTML = App.quill ? App.quill.root.innerHTML : '';
+  // Sin interfaz de edición: placeholders, botones y estados de las tablas/capturas
+  body.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  body.querySelectorAll('button, .table-toolbar, .eots-table-toolbar, .ql-tooltip').forEach(el => el.remove());
+  root.appendChild(body);
+
+  // Bibliografía al final si el documento aún no la incluye (igual que en Word)
+  const text = body.textContent || '';
+  const already = Array.from(body.querySelectorAll('h1,h2,h3')).some(x => /^(bibliograf|referencias|obras citadas)/i.test(x.textContent.trim()));
+  if (!already && text && (App.project.sources || []).length) {
+    const style = projectCitationStyle();
+    const bh = document.createElement('h1');
+    bh.textContent = style === 'apa' ? 'Referencias' : style === 'mla' ? 'Obras citadas' : 'Bibliografía';
+    body.appendChild(bh);
+    App.project.sources.forEach(src => {
+      const p = document.createElement('p');
+      p.className = 'print-bib';
+      p.innerHTML = formatBibliographyEntry(src, style);
+      body.appendChild(p);
+    });
+  }
+  document.body.appendChild(root);
+  return root;
+}
+
+function endPrintMode() {
+  document.body.classList.remove('printing-doc');
+  document.getElementById('print-root')?.remove();
+}
+function startPrintMode() {
+  if (!App.project) return;
+  buildPrintRoot();
+  document.body.classList.add('printing-doc');
+}
+// También cuando se imprime con Ctrl+P o desde el menú del navegador
+window.addEventListener('beforeprint', () => { if (!document.body.classList.contains('printing-doc')) startPrintMode(); });
+window.addEventListener('afterprint', endPrintMode);
+
 function exportToPDF() {
   SoundFx.play('export_success');
-  window.print();
+  startPrintMode();
+  // Dar tiempo a que carguen las imágenes de las capturas antes de abrir el diálogo
+  const imgs = Array.from(document.querySelectorAll('#print-root img'));
+  Promise.all(imgs.map(img => img.complete ? null : new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 3000); })))
+    .then(() => {
+      window.print();
+      // Algunos navegadores móviles no emiten afterprint
+      setTimeout(() => { if (document.body.classList.contains('printing-doc')) endPrintMode(); }, 60000);
+    });
 }
 
 // --- Word (.docx) usando la librería docx ---
@@ -2848,17 +2909,24 @@ async function exportToDocx() {
   let hasBibliography = false;
 
   let runs = [];
+  let olCounter = 0;
   const flush = (attrs = {}) => {
     const text = runs.map(r => r._t).join('');
     if (attrs.header && /^(bibliograf|referencias|obras citadas)/i.test(text.trim())) hasBibliography = true;
+    const list = attrs.list;
+    olCounter = list === 'ordered' ? olCounter + 1 : 0;
+    const prefix = list === 'ordered' ? [new TextRun(olCounter + '. ')] : [];
     children.push(new Paragraph({
-      children: runs.length ? runs.map(r => r.run) : [new TextRun('')],
+      children: prefix.concat(runs.length ? runs.map(r => r.run) : [new TextRun('')]),
       alignment: alignOf(attrs.align),
       heading: headings[attrs.header] || undefined,
-      spacing: { after: 180, line: 276 },
+      bullet: list === 'bullet' ? { level: 0 } : undefined,
+      indent: list === 'ordered' ? { left: 720, hanging: 360 } : attrs.blockquote ? { left: 720 } : undefined,
+      spacing: { after: list ? 60 : 180, line: 276 },
     }));
     runs = [];
   };
+  const imageSize = src => new Promise(res => { const im = new Image(); im.onload = () => res([im.naturalWidth || 400, im.naturalHeight || 300]); im.onerror = () => res([400, 300]); im.src = src; });
 
   for (const op of (delta?.ops || [])) {
     if (typeof op.insert === 'string') {
@@ -2893,6 +2961,16 @@ async function exportToDocx() {
         spacing: { after: 200 },
         children: [new TextRun({ text: v.caption || (blob ? v.filename : `[Captura no disponible: ${v.filename}]`), italics: true, size: 18 })],
       }));
+    } else if (op.insert && typeof op.insert.image === 'string' && ImageRun) {
+      // Imagen pegada o insertada directamente (no es una captura registrada)
+      try {
+        if (runs.length) flush();
+        const src = op.insert.image;
+        const buf = await (await fetch(src)).arrayBuffer();
+        const [w0, h0] = await imageSize(src);
+        const scale = Math.min(1, 560 / w0);
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: buf, transformation: { width: Math.round(w0 * scale), height: Math.round(h0 * scale) } })] }));
+      } catch (_) { /* imagen inaccesible: se omite */ }
     } else if (op.insert && op.insert['academic-table'] && Table) {
       if (runs.length) flush();
       const holder = document.createElement('div');

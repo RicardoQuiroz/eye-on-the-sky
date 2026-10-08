@@ -2156,3 +2156,29 @@ body {
 @media (max-width: 900px) {
   #sidebar-telemetry:not(.collapsed) { width: 300px; max-width: 88vw; }
 }
+
+/* v3.4 — PDF de varias páginas: se imprime una copia limpia del documento (#print-root),
+   no la interfaz del editor (que tiene alto fijo y solo cabía en una página). */
+#print-root { display: none; }
+@media print {
+  @page { size: auto; margin: 2.2cm 2cm; }
+  body.printing-doc > *:not(#print-root) { display: none !important; }
+  html, body.printing-doc {
+    height: auto !important; min-height: 0 !important; overflow: visible !important;
+    background: #fff !important; position: static !important;
+  }
+  body.printing-doc #print-root {
+    display: block !important; color: #000; background: #fff;
+    font-family: 'Lora', Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;
+  }
+  #print-root .print-title { font-size: 20pt; margin: 0 0 18pt; line-height: 1.25; }
+  #print-root .print-body { padding: 0 !important; height: auto !important; overflow: visible !important; }
+  #print-root .print-body p { margin: 0 0 8pt; orphans: 3; widows: 3; }
+  #print-root .print-body h1, #print-root .print-body h2, #print-root .print-body h3 { break-after: avoid; page-break-after: avoid; }
+  #print-root .print-body img { max-width: 100%; height: auto; }
+  #print-root .print-body figure, #print-root .print-body table, #print-root .print-body img { break-inside: avoid; page-break-inside: avoid; }
+  #print-root .print-body table { border-collapse: collapse; width: 100%; }
+  #print-root .print-body th, #print-root .print-body td { border: 1px solid #999; padding: 4pt 6pt; }
+  #print-root [style*="background-color"] { background-color: transparent !important; }
+  #print-root .print-bib { padding-left: 1.27cm; text-indent: -1.27cm; }
+}
